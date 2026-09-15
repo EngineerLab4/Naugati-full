@@ -1,0 +1,20 @@
+{
+  "name": "realtime-gateway",
+  "version": "0.1.0",
+  "description": "NAUGATI realtime-gateway - WS/SSE push for alerts and ETA/position changes",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "start:dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

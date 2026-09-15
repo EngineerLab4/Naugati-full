@@ -1,0 +1,31 @@
+{
+    "name": "naugati-ingestion-service",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "start": "node src/index.js",
+        "test:routing": "node src/tests/testSeaRoutes.js",
+        "test:ais": "node src/tests/testVesselFinder.js",
+        "test:geopolitical": "node src/tests/testGdelt.js",
+        "test:market": "node src/tests/testTradingEconomics.js",
+        "test:health": "node src/tests/testProviderHealth.js",
+        "test:health-integration": "node src/tests/testProviderHealthIntegration.js",
+        "test:health-summary": "node src/tests/testProviderHealthSummary.js",
+        "test:runner": "node src/tests/testIngestionRunner.js",
+        "test:scheduler": "node src/tests/testIngestionScheduler.js",
+        "test:tasks": "node src/tests/testIngestionTasks.js",
+        "test:runtime-config": "node src/tests/testRuntimeConfig.js",
+        "test:runtime": "node src/tests/testIngestionRuntime.js",
+        "test:runtime-live-weather": "node src/tests/testOpenMeteoRuntimeLive.js",
+        "test:weather-health": "node src/tests/testOpenMeteoHealth.js",
+        "test:routing-health": "node src/tests/testSeaRoutesHealth.js",
+        "test:ais-health": "node src/tests/testVesselFinderHealth.js",
+        "test:market-health": "node src/tests/testTradingEconomicsHealth.js",
+        "test:geopolitical-health": "node src/tests/testGdeltHealth.js"
+    },
+    "dependencies": {
+        "axios": "^1.7.0",
+        "dotenv": "^16.4.0"
+    }
+}

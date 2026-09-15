@@ -1,0 +1,35 @@
+{
+  "system_name": "Maritime Weather Risk Assessment Engine",
+  "version": "weather_risk_live_v1",
+  "status": "deterministic_live_api_calibrated",
+  "historical_ml_training_status": "PENDING_HISTORICAL_DATASET",
+  "explanation": "Audited workspace datasets contained no historical meteorological time series (wave height, swell period, gale force wind) linked to voyage incidents or port closures. Per engineering guidelines, no fabricated offline ML model was generated. System utilizes real-time hydrodynamic & atmospheric API telemetry from Open-Meteo / Weather API calibrated against vessel class design tolerances.",
+  "required_historical_datasets_for_ml_retraining": [
+    "Copernicus Marine Service / NOAA ERA5 global historical sea state reanalysis (wave height, peak period, swell direction)",
+    "NOAA Global Marine Surface Weather Observations (sustained wind speed, Beaufort scale, gust force, barometric pressure)",
+    "Historical Port Authority Logbooks (recorded berth suspension hours and anchorage closures due to sea-swell/cyclones)",
+    "Vessel Voyage Disruption Logs (historical speed reduction and route deviations attributed to weather)"
+  ],
+  "vessel_class_limits": {
+    "Capesize": {
+      "max_wave_height_m": 5.5,
+      "max_wind_knots": 45.0,
+      "risk_multiplier": 0.85
+    },
+    "Panamax": {
+      "max_wave_height_m": 4.0,
+      "max_wind_knots": 38.0,
+      "risk_multiplier": 1.0
+    },
+    "Supramax": {
+      "max_wave_height_m": 3.5,
+      "max_wind_knots": 34.0,
+      "risk_multiplier": 1.15
+    },
+    "Handysize": {
+      "max_wave_height_m": 3.0,
+      "max_wind_knots": 30.0,
+      "risk_multiplier": 1.3
+    }
+  }
+}

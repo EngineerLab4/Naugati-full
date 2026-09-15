@@ -1,0 +1,13 @@
+{
+  "name": "naugati-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NAUGATI Logistics & Shipping Intelligence Platform Monorepo Workspace",
+  "scripts": {
+    "dev": "npm --prefix NAUGATI_Frontend run dev",
+    "dev:frontend": "npm --prefix NAUGATI_Frontend run dev",
+    "dev:backend": "npm --prefix \"NAUGATI Backend/core-api\" run start:dev",
+    "build:frontend": "npm --prefix NAUGATI_Frontend run build",
+    "build:backend": "npm --prefix \"NAUGATI Backend/core-api\" run build"
+  }
+}

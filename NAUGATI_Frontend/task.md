@@ -1,0 +1,19 @@
+- `[x]` Update `index.css` to implement the new "White + Light Blue + #04ADDE" color palette, Poppins font, and structural CSS classes (Sidebar, Main Content).
+- `[x]` Install `react-router-dom` and `recharts` for navigation and data visualization.
+- `[x]` Build the 7-second Cinematic Loading Screen (`LoadingScreen.jsx`).
+- `[x]` Build the new Enterprise Landing Page (`LandingHome.jsx`).
+- `[x]` Build the Dashboard Shell (`Dashboard.jsx`, `Sidebar.jsx`, `Topnav.jsx`) with all routing links.
+- `[x]` Implement `UserDashboard.jsx` (Home view with Alerts and Active Shipments).
+- `[x]` Implement `CargoRequirement.jsx` (Step 1: Input forms).
+- `[x]` Implement `VesselAvailability.jsx` (Step 2: Matching vessels & NAUGATI Score).
+- `[x]` Implement `VesselDetails.jsx` (Deep dive into vessel specs & "WHY").
+- `[x]` Implement `FreightForecast.jsx` (AI charts and booking window logic).
+- `[x]` Implement `ContractRecommendation.jsx` (Spot vs Short vs Long term analysis).
+- `[x]` Implement `EtaPrediction.jsx` (Transit timeline and delay probability).
+- `[x]` Implement `DeadheadingOptimization.jsx` (Empty repositioning savings).
+- `[x]` Implement `RiskIntelligence.jsx` (Geopolitical, Weather, Congestion).
+- `[x]` Implement `RouteOptimization.jsx` (Map comparison of route options).
+- `[x]` Implement `LiveMap.jsx` (Macro tracking dashboard).
+- `[x]` Implement `FinalRecommendation.jsx` (The consolidated final decision view).
+- `[x]` Implement `Reports.jsx` (PDF report generation flow).
+- `[x]` Verify routing and component rendering.

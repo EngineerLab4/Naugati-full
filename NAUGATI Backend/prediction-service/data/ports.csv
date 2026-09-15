@@ -1,0 +1,4 @@
+unlocode,name,country,lat,lng,port_type,terminal_type,max_vessel_size,draft_restriction
+SGSIN,Singapore,Singapore,1.2644,103.8200,bulk,multi-purpose,capesize,21.0
+NLRTM,Rotterdam,Netherlands,51.9496,4.1453,bulk,multi-purpose,capesize,24.0
+CNSHA,Shanghai,China,31.2304,121.4737,bulk,container,capesize,17.5

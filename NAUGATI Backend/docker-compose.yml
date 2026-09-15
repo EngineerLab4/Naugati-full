@@ -1,0 +1,97 @@
+version: "3.9"
+
+services:
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: naugati
+      MONGO_INITDB_ROOT_PASSWORD: naugati
+      MONGO_INITDB_DATABASE: naugati
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+      - ./infra/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+
+  core-api:
+    build: ./core-api
+    restart: unless-stopped
+    env_file: ./core-api/.env
+    environment:
+      MONGODB_URI: mongodb://naugati:naugati@mongodb:27017/naugati?authSource=admin
+      REDIS_URL: redis://redis:6379
+      PREDICTION_SERVICE_URL: http://prediction-service:8000
+      RECOMMENDATION_SERVICE_URL: http://recommendation-service:8001
+    ports:
+      - "3000:3000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  realtime-gateway:
+    build: ./realtime-gateway
+    restart: unless-stopped
+    env_file: ./realtime-gateway/.env
+    environment:
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "4000:4000"
+    depends_on:
+      - redis
+
+  ingestion-service:
+    build: ./ingestion-service
+    restart: unless-stopped
+    env_file: ./ingestion-service/.env
+    environment:
+      PORT: 5001
+      MONGODB_URI: mongodb://naugati:naugati@mongodb:27017/naugati?authSource=admin
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "5001:5001"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  prediction-service:
+    build: ./prediction-service
+    restart: unless-stopped
+    env_file: ./prediction-service/.env
+    environment:
+      MONGODB_URI: mongodb://naugati:naugati@mongodb:27017/naugati?authSource=admin
+    ports:
+      - "8000:8000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  recommendation-service:
+    build: ./recommendation-service
+    restart: unless-stopped
+    env_file: ./recommendation-service/.env
+    environment:
+      MONGODB_URI: mongodb://naugati:naugati@mongodb:27017/naugati?authSource=admin
+    ports:
+      - "8001:8001"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+volumes:
+  mongodata:

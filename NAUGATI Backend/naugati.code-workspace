@@ -1,0 +1,27 @@
+{
+  "folders": [
+    { "name": "root", "path": "." },
+    { "name": "core-api", "path": "core-api" },
+    { "name": "realtime-gateway", "path": "realtime-gateway" },
+    { "name": "ingestion-service", "path": "ingestion-service" },
+    { "name": "prediction-service", "path": "prediction-service" },
+    { "name": "recommendation-service", "path": "recommendation-service" }
+  ],
+  "settings": {
+    "editor.formatOnSave": true,
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/__pycache__": true
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "ms-python.python",
+      "ms-python.vscode-pylance",
+      "ms-azuretools.vscode-docker",
+      "cweijan.vscode-postgresql-client2"
+    ]
+  }
+}
