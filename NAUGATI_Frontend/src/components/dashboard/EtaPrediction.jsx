@@ -4,28 +4,17 @@ import {
   Anchor, Clock, CheckCircle2, Activity, ArrowRight 
 } from 'lucide-react';
 import { useShipment } from '../../context/ShipmentContext';
+import LockedGate from './LockedGate';
 
 export default function EtaPrediction() {
-  const { shipment, activePort, activeOrigin, analysisResult } = useShipment();
+  const { shipment, activePort, activeOrigin, analysisResult, hasExecuted } = useShipment();
 
-  const eta = analysisResult?.eta || {
-    estimatedOceanArrival: "Sept 28, 14:30",
-    estimatedBerthing: "Sept 30, 08:00",
-    estimatedCompletion: "Oct 2, 18:00",
-    delayProbability: "24%",
-    expectedDelayDays: 0.7,
-    primaryDelayFactors: [
-      { factor: "Bay of Bengal Seasonal Swell", impact: "+0.3 days", severity: "low" },
-      { factor: "Mechanised Coal Berth Queue", impact: "+0.4 days", severity: "medium" }
-    ],
-    milestones: [
-      { name: "Ocean Departure", date: "Departs Day 0", status: "completed" },
-      { name: "Strait Transit Corridor", date: "+4.5 Days", status: "scheduled" },
-      { name: "Pilot Boarding Station", date: "+12.3 Days", status: "scheduled" },
-      { name: "Berthing & Discharge", date: "+14.1 Days", status: "scheduled" },
-      { name: "Cargo Handover Completed", date: "+15.6 Days", status: "scheduled" }
-    ]
-  };
+  // Lock gate — only show real ETA after ML pipeline has computed it
+  if (!hasExecuted || !analysisResult) {
+    return <LockedGate pageName="ETA Prediction" />;
+  }
+
+  const eta = analysisResult?.eta || {};
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>

@@ -30,6 +30,10 @@ class ApiClient {
     }
   }
 
+  // ==========================================
+  // 1. ML PREDICTION ENGINE ENDPOINTS
+  // ==========================================
+
   // 1. Freight Rate Multi-Horizon Prediction (1M, 3M, 6M)
   async getFreightForecast(params) {
     return this.request('/predictions/freight-rate', {
@@ -70,17 +74,125 @@ class ApiClient {
     });
   }
 
-  // Real-time Market Overview (Alpha Vantage + FRED)
+  // 6. Next-Day Wave Height Model (ExtraTrees ML Model - Experimental)
+  async getWaveHeight(params) {
+    return this.request('/predictions/weather/wave-height', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  // 7. Charter Optimization Engine (OR / Multi-Vessel)
+  async optimizeCharter(params) {
+    return this.request('/predictions/charter/optimize', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  // 8. Bunker Fuel 7-Day Forecast (Persistence Baseline)
+  async getBunkerForecast(params) {
+    return this.request('/predictions/bunker/forecast', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  // 9. Commodity 1-Month Forecast (Persistence Baseline)
+  async getCommodityForecast(params) {
+    return this.request('/predictions/commodity/forecast', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  // 10. ML Models Health Status
+  async getModelsHealth() {
+    return this.request('/predictions/health/models', {
+      method: 'GET',
+    });
+  }
+
+  // Real-time Market Overview (Commodities + Macro Benchmarks combined)
   async getMarketOverview() {
     return this.request('/predictions/market-overview', {
       method: 'GET',
     });
   }
 
-  // Live AIS Vessels (AISStream)
+  // ==========================================
+  // 2. REAL-TIME DATA TELEMETRY INTEGRATIONS
+  // ==========================================
+
+  // Live AIS Vessels
   async getLiveVessels() {
-    return this.request('/predictions/vessels/live', {
+    return this.request('/vessels/live', {
       method: 'GET',
+    });
+  }
+
+  // Single Vessel lookup by MMSI
+  async getVesselByMmsi(mmsi) {
+    return this.request(`/vessels/${mmsi}`, {
+      method: 'GET',
+    });
+  }
+
+  // Real-Time Commodity Prices
+  async getBrent() {
+    return this.request('/market/brent', { method: 'GET' });
+  }
+
+  async getWTI() {
+    return this.request('/market/wti', { method: 'GET' });
+  }
+
+  async getNaturalGas() {
+    return this.request('/market/natural-gas', { method: 'GET' });
+  }
+
+  async getCopper() {
+    return this.request('/market/copper', { method: 'GET' });
+  }
+
+  async getAluminum() {
+    return this.request('/market/aluminum', { method: 'GET' });
+  }
+
+  async getWheat() {
+    return this.request('/market/wheat', { method: 'GET' });
+  }
+
+  // Real Economic Indicators
+  async getFedFunds() {
+    return this.request('/economic/fedfunds', { method: 'GET' });
+  }
+
+  async getEconomicSeries(seriesId) {
+    return this.request(`/economic/series/${seriesId}`, { method: 'GET' });
+  }
+
+  async getEconomicOverview() {
+    return this.request('/economic/overview', { method: 'GET' });
+  }
+
+  // Shipowner Operations
+  async getDeadheading(vesselId, loadingPortId) {
+    return this.request(`/vessels/${vesselId}/deadheading?loading_port_id=${encodeURIComponent(loadingPortId)}`, {
+      method: 'GET',
+    });
+  }
+
+  async getAlternativeEmployment(vesselId) {
+    return this.request(`/vessels/${vesselId}/alternative-employment`, {
+      method: 'GET',
+    });
+  }
+
+  async declareAvailability(vesselId, data) {
+    return this.request(`/vessels/${vesselId}/availability`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 

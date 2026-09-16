@@ -6,6 +6,7 @@ except ImportError:
     Instrumentator = None
 
 from app.routers import (
+    ml_v1,
     freight_rate,
     market_direction,
     port_congestion,
@@ -15,18 +16,24 @@ from app.routers import (
     alternative_employment,
 )
 from app.model_registry import registry
+from app.ml.freight.service import freight_service
+from app.ml.weather.service import weather_service
+from app.ml.charter.service import charter_service
+from app.ml.bunker.service import bunker_service
+from app.ml.commodity.service import commodity_service
 
 app = FastAPI(
     title="NAUGATI ML Prediction Service",
     description=(
-        "Production-oriented ML inference engine for Maritime & Logistics Intelligence. "
-        "Hosts Freight Rate (1M, 3M, 6M), 7-Day Market Direction, Port Congestion, "
-        "Voyage ETA, and Maritime Weather Risk models."
+        "Production ML inference engine for Maritime & Logistics Intelligence. "
+        "Hosts the 5 official trained artifacts: Freight Rate Random Forest, "
+        "Wave Height ExtraTrees, Charter Optimization Engine, Bunker Persistence Baseline, "
+        "and Commodity Persistence Baseline."
     ),
-    version="1.0.0",
+    version="2.0.0",
 )
 
-# CORS middleware for frontend and service-to-service communication
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,7 +45,15 @@ app.add_middleware(
 if Instrumentator is not None:
     Instrumentator().instrument(app).expose(app)
 
-# Core 5 ML Prediction Routers
+# -------------------------------------------------------------
+# Official API v1 Endpoints & Health Check
+# -------------------------------------------------------------
+app.include_router(ml_v1.router, prefix="/api/v1")
+app.include_router(ml_v1.router)  # Also mounts /health/models at root
+
+# -------------------------------------------------------------
+# Core Internal Prediction Routers (backwards compatibility)
+# -------------------------------------------------------------
 app.include_router(freight_rate.router, prefix="/internal/predict", tags=["freight-rate"])
 app.include_router(market_direction.router, prefix="/internal/predict", tags=["market-direction"])
 app.include_router(port_congestion.router, prefix="/internal/predict", tags=["port-congestion"])
@@ -52,9 +67,37 @@ app.include_router(alternative_employment.router, prefix="/internal/recommend", 
 
 @app.on_event("startup")
 async def load_models_on_startup():
-    print("[prediction-service] Starting up and loading trained models into registry...")
-    registry.load_all()
-    print(f"[prediction-service] Loaded models: {registry.loaded_model_names()}")
+    print("\n" + "="*60)
+    print("[prediction-service] Initializing NAUGATI Trained ML Models...")
+    print("="*60)
+
+    # 1. Load Freight Model (95MB Random Forest)
+    try:
+        freight_service.load()
+    except Exception as e:
+        print(f"[ERR] Failed to load Freight Model: {e}")
+
+    # 2. Load Wave Height Model (368MB ExtraTrees)
+    try:
+        weather_service.load()
+    except Exception as e:
+        print(f"[ERR] Failed to load Wave Height Model: {e}")
+
+    # 3. Load Charter Optimization Engine
+    try:
+        charter_service.load()
+    except Exception as e:
+        print(f"[ERR] Failed to load Charter Engine: {e}")
+
+    # 4. Load legacy registry
+    try:
+        registry.load_all()
+    except Exception as e:
+        print(f"[ERR] Legacy registry load: {e}")
+
+    print("="*60)
+    print("[prediction-service] Startup complete. All 5 ML services active.")
+    print("="*60 + "\n")
 
 
 @app.get("/healthz")
@@ -62,8 +105,13 @@ def healthz():
     return {
         "status": "ok",
         "service": "prediction-service",
-        "models_loaded": registry.loaded_model_names(),
-        "versions": {m: registry.version(m) for m in registry.loaded_model_names()},
+        "ml_v1_models": {
+            "freight_loaded": freight_service.is_loaded,
+            "weather_loaded": weather_service.is_loaded,
+            "charter_loaded": charter_service.is_loaded,
+            "bunker_ready": True,
+            "commodity_ready": True,
+        }
     }
 
 

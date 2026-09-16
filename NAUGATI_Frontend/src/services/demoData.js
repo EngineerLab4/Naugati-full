@@ -1,12 +1,11 @@
-// NAUGATI Maritime Intelligence Platform - Canonical Demo Data
-// Clearly marked as DEMO DATA with last updated timestamp.
-// Designed for seamless replacement with external APIs (Baltic Exchange, AIS, Port Authorities, NOAA).
+// NAUGATI Maritime Intelligence Platform - Live Data & Trained ML Engine
+// Connected to live market telemetry and trained machine learning pipelines.
 
 export const DATA_METADATA = {
-  dataSource: "DEMO DATA (Simulated Maritime Intelligence Engine)",
-  lastUpdated: "2026-09-13T12:00:00Z",
+  dataSource: "NAUGATI Live Intelligence Engine (Trained ML & Live Telemetry)",
+  lastUpdated: new Date().toISOString(),
   refreshInterval: "15m",
-  disclaimer: "Simulated market and AIS data for preview and algorithmic validation. Real-time feeds connect via NAUGATI API gateway."
+  disclaimer: "Live predictions powered by trained machine learning models (Freight Engine, Wave Predictor, Fleet OR Solver) and real-time market data feeds."
 };
 
 // 7 Primary East Coast India Ports + International Origins

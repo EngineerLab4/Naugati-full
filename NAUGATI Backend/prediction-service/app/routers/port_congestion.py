@@ -46,29 +46,25 @@ def predict_port_congestion(req: PortCongestionRequest):
     waiting_hours = 24.0
     confidence = 0.85
 
-    if artifact and isinstance(artifact, dict):
-        classifier = artifact.get("classifier")
-        regressor = artifact.get("regressor")
-        feature_cols = artifact.get("feature_cols", list(feat_df.columns))
+    if not (artifact and isinstance(artifact, dict)):
+        raise HTTPException(
+            status_code=503,
+            detail="Port congestion model artifact is not loaded. No synthetic predictions generated."
+        )
 
-        if classifier is not None:
-            congestion_level = str(classifier.predict(feat_df[feature_cols])[0])
-        if regressor is not None:
-            waiting_hours = float(regressor.predict(feat_df[feature_cols])[0])
-    else:
-        # Calibrated fallback
-        if vessels_waiting <= 3:
-            congestion_level = "Low"
-            waiting_hours = 12.5
-        elif vessels_waiting <= 6:
-            congestion_level = "Medium"
-            waiting_hours = 26.0
-        elif vessels_waiting <= 10:
-            congestion_level = "High"
-            waiting_hours = 48.0
-        else:
-            congestion_level = "Severe"
-            waiting_hours = 72.0
+    classifier = artifact.get("classifier")
+    regressor = artifact.get("regressor")
+    feature_cols = artifact.get("feature_cols", list(feat_df.columns))
+
+    if classifier is None or regressor is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Port congestion sub-estimators are incomplete."
+        )
+
+    congestion_level = str(classifier.predict(feat_df[feature_cols])[0])
+    waiting_hours = float(regressor.predict(feat_df[feature_cols])[0])
+    confidence = 0.85
 
     waiting_days = round(waiting_hours / 24.0, 2)
     score_map = {"Low": 25.0, "Medium": 50.0, "High": 75.0, "Severe": 92.0}

@@ -8,15 +8,20 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const WorkflowAnimation = () => {
+const WorkflowAnimation = ({ onStepChange }) => {
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(1);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [speed, setSpeed] = useState(1); // 1x, 1.5x, 2x
 
-  // Preset scenarios that users can click to test different routes & predictions
   const [selectedScenario, setSelectedScenario] = useState(0);
+  const [selectedFields, setSelectedFields] = useState({
+    origin: false,
+    destination: false,
+    cargo: false
+  });
+  const [selectedRouteType, setSelectedRouteType] = useState('shortcut');
   const scenarios = [
     {
       name: 'Australia -> Dhamra Port',
@@ -77,7 +82,7 @@ const WorkflowAnimation = () => {
     {
       id: 1,
       number: '01',
-      title: 'Enter Cargo & Voyage Route',
+      title: 'Enter Cargo Requirements',
       subtitle: 'Input origin, destination port, commodity, and laycan window.',
       tag: 'SEARCH & INPUT',
       icon: <MapPin size={20} className="text-[#04ADDE]" />
@@ -85,26 +90,26 @@ const WorkflowAnimation = () => {
     {
       id: 2,
       number: '02',
-      title: 'AI Freight Rate Prediction',
-      subtitle: 'Real-time AI econometric models forecast $/MT and market curves.',
-      tag: 'PREDICT ENGINE',
-      icon: <TrendingUp size={20} className="text-[#04ADDE]" />
-    },
-    {
-      id: 3,
-      number: '03',
       title: 'Carrier & Vessel Matching',
       subtitle: 'Rank verified vessels by DWT, draft compatibility, and ratings.',
       tag: 'MATCH & CAPACITY',
       icon: <Ship size={20} className="text-[#04ADDE]" />
     },
     {
-      id: 4,
-      number: '04',
+      id: 3,
+      number: '03',
       title: 'Route Optimization & Shortcut',
       subtitle: 'Simulate weather, fuel burn, canal/strait shortcuts, and ETA.',
       tag: 'ROUTE & SIMULATION',
       icon: <Navigation size={20} className="text-[#04ADDE]" />
+    },
+    {
+      id: 4,
+      number: '04',
+      title: 'AI Freight Rate Prediction',
+      subtitle: 'Real-time AI econometric models forecast $/MT and market curves.',
+      tag: 'PREDICT ENGINE',
+      icon: <TrendingUp size={20} className="text-[#04ADDE]" />
     },
     {
       id: 5,
@@ -124,7 +129,13 @@ const WorkflowAnimation = () => {
       interval = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 100) {
-            setActiveStep((curr) => (curr >= 5 ? 1 : curr + 1));
+            setActiveStep((curr) => {
+              if (curr >= 5) {
+                setSelectedScenario((s) => (s + 1) % scenarios.length);
+                return 1;
+              }
+              return curr + 1;
+            });
             return 0;
           }
           return prev + 100 / (STEP_DURATION / 50);
@@ -132,7 +143,41 @@ const WorkflowAnimation = () => {
       }, 50);
     }
     return () => clearInterval(interval);
-  }, [isPlaying, activeStep, speed]);
+  }, [isPlaying, activeStep, speed, scenarios.length]);
+
+  useEffect(() => {
+    if (onStepChange) {
+      onStepChange(activeStep);
+    }
+  }, [activeStep, onStepChange]);
+
+  const toggleSelectField = (field) => {
+    setSelectedFields((prev) => ({
+      ...prev,
+      [field]: true
+    }));
+  };
+
+  const handleSelectAllFields = () => {
+    setSelectedFields({
+      origin: true,
+      destination: true,
+      cargo: true
+    });
+  };
+
+  const allFieldsSelected = selectedFields.origin && selectedFields.destination && selectedFields.cargo;
+
+  // When all 3 fields are selected in Step 1, after a brief delight moment the rest opens and workflow continues
+  useEffect(() => {
+    if (activeStep === 1 && allFieldsSelected) {
+      const timer = setTimeout(() => {
+        setActiveStep(2);
+        setProgress(0);
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [allFieldsSelected, activeStep]);
 
   const handleStepClick = (stepId) => {
     setActiveStep(stepId);
@@ -146,6 +191,12 @@ const WorkflowAnimation = () => {
   const handleReset = () => {
     setActiveStep(1);
     setProgress(0);
+    setSelectedFields({
+      origin: false,
+      destination: false,
+      cargo: false
+    });
+    setSelectedRouteType('shortcut');
   };
 
   return (
@@ -173,7 +224,11 @@ const WorkflowAnimation = () => {
           {scenarios.map((sc, idx) => (
             <button
               key={idx}
-              onClick={() => { setSelectedScenario(idx); setProgress(0); }}
+              onClick={() => { 
+                setSelectedScenario(idx); 
+                setProgress(0); 
+                setSelectedFields({ origin: true, destination: true, cargo: true });
+              }}
               style={{
                 padding: '0.5rem 1.15rem',
                 borderRadius: '20px',
@@ -439,7 +494,7 @@ const WorkflowAnimation = () => {
               <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10b981' }}></div>
             </div>
 
-            {/* URL / Path Display */}
+            {/* Route / Scenario Display */}
             <div style={{
               flex: 1,
               maxWidth: '520px',
@@ -454,8 +509,8 @@ const WorkflowAnimation = () => {
               gap: '0.5rem',
               justifyContent: 'center'
             }}>
-              <span style={{ color: '#04ADDE', fontWeight: 700 }}>https://</span>
-              <span>naugati.ai/freight-engine/{currentScenario.originCode}-to-{currentScenario.destCode}</span>
+              <span style={{ color: '#04ADDE', fontWeight: 800, letterSpacing: '0.05em' }}>NAUGATI - </span>
+              <span style={{ color: '#ffffff', fontWeight: 700 }}>{currentScenario.originCode}-to-{currentScenario.destCode}</span>
             </div>
 
             {/* Stage Indicator Pill */}
@@ -487,9 +542,9 @@ const WorkflowAnimation = () => {
 
             {[
               { id: 1, label: 'Search & Input' },
-              { id: 2, label: 'AI Prediction' },
-              { id: 3, label: 'Carrier Match' },
-              { id: 4, label: 'Route & ETA' },
+              { id: 2, label: 'Carrier Match' },
+              { id: 3, label: 'Route & ETA' },
+              { id: 4, label: 'AI Prediction' },
               { id: 5, label: 'Execution' }
             ].map((st) => {
               const isCurr = activeStep === st.id;
@@ -551,7 +606,7 @@ const WorkflowAnimation = () => {
               <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Origin Port</div>
               <div style={{ fontSize: '0.9rem', color: '#ffffff', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.15rem' }}>
                 <MapPin size={14} className="text-[#04ADDE]" />
-                {currentScenario.origin}
+                {selectedFields.origin ? currentScenario.origin : <span style={{ color: '#64748b', fontStyle: 'italic', fontWeight: 500, fontSize: '0.85rem' }}>Awaiting selection</span>}
               </div>
             </div>
 
@@ -559,21 +614,21 @@ const WorkflowAnimation = () => {
               <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Destination Port</div>
               <div style={{ fontSize: '0.9rem', color: '#38bdf8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.15rem' }}>
                 <MapPin size={14} className="text-emerald-400" />
-                {currentScenario.destination}
+                {selectedFields.destination ? currentScenario.destination : <span style={{ color: '#64748b', fontStyle: 'italic', fontWeight: 500, fontSize: '0.85rem' }}>Awaiting selection</span>}
               </div>
             </div>
 
             <div style={{ borderRight: '1px solid rgba(255,255,255,0.1)', paddingRight: '1rem' }}>
               <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Cargo Volume</div>
               <div style={{ fontSize: '0.9rem', color: '#ffffff', fontWeight: 700, marginTop: '0.15rem' }}>
-                {currentScenario.cargo}
+                {selectedFields.cargo ? currentScenario.cargo : <span style={{ color: '#64748b', fontStyle: 'italic', fontWeight: 500, fontSize: '0.85rem' }}>Awaiting selection</span>}
               </div>
             </div>
 
             <div>
               <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Vessel Spec</div>
               <div style={{ fontSize: '0.9rem', color: '#cbd5e1', fontWeight: 600, marginTop: '0.15rem' }}>
-                {currentScenario.vesselClass}
+                {allFieldsSelected ? currentScenario.vesselClass : <span style={{ color: '#64748b', fontStyle: 'italic', fontWeight: 500, fontSize: '0.85rem' }}>Auto-matching</span>}
               </div>
             </div>
 
@@ -626,152 +681,293 @@ const WorkflowAnimation = () => {
                     </div>
                   </div>
 
-                  {/* Form Grid Simulation */}
+                  {/* Form Grid Simulation - Boxes with SELECT tags */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
-                    <div style={{ padding: '1.25rem', backgroundColor: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(4, 173, 222, 0.3)', borderRadius: '12px' }}>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.4rem' }}>Origin Port & Terminal</div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>{currentScenario.origin}</div>
-                      <div style={{ fontSize: '0.8rem', color: '#04ADDE', marginTop: '0.35rem' }}>Draft Available: 17.5m (Cape OK)</div>
+                    
+                    {/* Box 1: Origin Port */}
+                    <div 
+                      onClick={() => toggleSelectField('origin')}
+                      style={{ 
+                        padding: '1.25rem', 
+                        backgroundColor: selectedFields.origin ? 'rgba(15, 23, 42, 0.85)' : 'rgba(15, 23, 42, 0.55)', 
+                        border: selectedFields.origin ? '1.5px solid #04ADDE' : '1.5px dashed rgba(4, 173, 222, 0.45)', 
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.25s ease',
+                        boxShadow: selectedFields.origin ? '0 4px 20px rgba(4, 173, 222, 0.2)' : 'none',
+                        position: 'relative'
+                      }}
+                      className="hover:border-[#04ADDE] transition-all"
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Origin Port & Terminal</div>
+                        {selectedFields.origin ? (
+                          <span style={{ 
+                            padding: '0.2rem 0.65rem', 
+                            backgroundColor: 'rgba(16, 185, 129, 0.2)', 
+                            color: '#10b981', 
+                            border: '1px solid rgba(16, 185, 129, 0.4)', 
+                            borderRadius: '20px', 
+                            fontSize: '0.7rem', 
+                            fontWeight: 800 
+                          }}>
+                            SELECTED ✓
+                          </span>
+                        ) : (
+                          <span style={{ 
+                            padding: '0.25rem 0.75rem', 
+                            backgroundColor: '#04ADDE', 
+                            color: '#ffffff', 
+                            borderRadius: '20px', 
+                            fontSize: '0.75rem', 
+                            fontWeight: 800, 
+                            letterSpacing: '0.06em',
+                            boxShadow: '0 0 10px rgba(4, 173, 222, 0.5)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}>
+                            SELECT
+                          </span>
+                        )}
+                      </div>
+
+                      {selectedFields.origin ? (
+                        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+                          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff' }}>{currentScenario.origin}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#04ADDE', marginTop: '0.35rem', fontWeight: 600 }}>Draft Available: 17.5m (Cape OK)</div>
+                        </motion.div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748b', fontSize: '0.88rem', padding: '0.4rem 0' }}>
+                          <MapPin size={16} className="text-[#04ADDE]" />
+                          <span>Click to assign origin terminal</span>
+                        </div>
+                      )}
                     </div>
 
-                    <div style={{ padding: '1.25rem', backgroundColor: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(4, 173, 222, 0.3)', borderRadius: '12px' }}>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.4rem' }}>Discharge Port (East Coast India)</div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#38bdf8' }}>{currentScenario.destination}</div>
-                      <div style={{ fontSize: '0.8rem', color: '#10b981', marginTop: '0.35rem' }}>Berth Congestion: Low (0.8 days wait)</div>
+                    {/* Box 2: Destination Port */}
+                    <div 
+                      onClick={() => toggleSelectField('destination')}
+                      style={{ 
+                        padding: '1.25rem', 
+                        backgroundColor: selectedFields.destination ? 'rgba(15, 23, 42, 0.85)' : 'rgba(15, 23, 42, 0.55)', 
+                        border: selectedFields.destination ? '1.5px solid #10b981' : '1.5px dashed rgba(16, 185, 129, 0.45)', 
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.25s ease',
+                        boxShadow: selectedFields.destination ? '0 4px 20px rgba(16, 185, 129, 0.2)' : 'none',
+                        position: 'relative'
+                      }}
+                      className="hover:border-emerald-400 transition-all"
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Discharge Port (East Coast India)</div>
+                        {selectedFields.destination ? (
+                          <span style={{ 
+                            padding: '0.2rem 0.65rem', 
+                            backgroundColor: 'rgba(16, 185, 129, 0.2)', 
+                            color: '#10b981', 
+                            border: '1px solid rgba(16, 185, 129, 0.4)', 
+                            borderRadius: '20px', 
+                            fontSize: '0.7rem', 
+                            fontWeight: 800 
+                          }}>
+                            SELECTED ✓
+                          </span>
+                        ) : (
+                          <span style={{ 
+                            padding: '0.25rem 0.75rem', 
+                            backgroundColor: '#04ADDE', 
+                            color: '#ffffff', 
+                            borderRadius: '20px', 
+                            fontSize: '0.75rem', 
+                            fontWeight: 800, 
+                            letterSpacing: '0.06em',
+                            boxShadow: '0 0 10px rgba(4, 173, 222, 0.5)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}>
+                            SELECT
+                          </span>
+                        )}
+                      </div>
+
+                      {selectedFields.destination ? (
+                        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+                          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#38bdf8' }}>{currentScenario.destination}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#10b981', marginTop: '0.35rem', fontWeight: 600 }}>Berth Congestion: Low (0.8 days wait)</div>
+                        </motion.div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748b', fontSize: '0.88rem', padding: '0.4rem 0' }}>
+                          <MapPin size={16} className="text-emerald-400" />
+                          <span>Click to assign discharge port</span>
+                        </div>
+                      )}
                     </div>
 
-                    <div style={{ padding: '1.25rem', backgroundColor: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(4, 173, 222, 0.3)', borderRadius: '12px' }}>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.4rem' }}>Laycan Window & Commodity</div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>{currentScenario.cargo}</div>
-                      <div style={{ fontSize: '0.8rem', color: '#fbbf24', marginTop: '0.35rem' }}>Laycan: Next 10-15 Days</div>
+                    {/* Box 3: Laycan & Cargo */}
+                    <div 
+                      onClick={() => toggleSelectField('cargo')}
+                      style={{ 
+                        padding: '1.25rem', 
+                        backgroundColor: selectedFields.cargo ? 'rgba(15, 23, 42, 0.85)' : 'rgba(15, 23, 42, 0.55)', 
+                        border: selectedFields.cargo ? '1.5px solid #fbbf24' : '1.5px dashed rgba(251, 191, 36, 0.45)', 
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.25s ease',
+                        boxShadow: selectedFields.cargo ? '0 4px 20px rgba(251, 191, 36, 0.2)' : 'none',
+                        position: 'relative'
+                      }}
+                      className="hover:border-amber-400 transition-all"
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Laycan Window & Commodity</div>
+                        {selectedFields.cargo ? (
+                          <span style={{ 
+                            padding: '0.2rem 0.65rem', 
+                            backgroundColor: 'rgba(16, 185, 129, 0.2)', 
+                            color: '#10b981', 
+                            border: '1px solid rgba(16, 185, 129, 0.4)', 
+                            borderRadius: '20px', 
+                            fontSize: '0.7rem', 
+                            fontWeight: 800 
+                          }}>
+                            SELECTED ✓
+                          </span>
+                        ) : (
+                          <span style={{ 
+                            padding: '0.25rem 0.75rem', 
+                            backgroundColor: '#04ADDE', 
+                            color: '#ffffff', 
+                            borderRadius: '20px', 
+                            fontSize: '0.75rem', 
+                            fontWeight: 800, 
+                            letterSpacing: '0.06em',
+                            boxShadow: '0 0 10px rgba(4, 173, 222, 0.5)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}>
+                            SELECT
+                          </span>
+                        )}
+                      </div>
+
+                      {selectedFields.cargo ? (
+                        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+                          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff' }}>{currentScenario.cargo}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#fbbf24', marginTop: '0.35rem', fontWeight: 600 }}>Laycan: Next 10-15 Days</div>
+                        </motion.div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748b', fontSize: '0.88rem', padding: '0.4rem 0' }}>
+                          <Ship size={16} className="text-amber-400" />
+                          <span>Click to assign cargo spec</span>
+                        </div>
+                      )}
                     </div>
+
                   </div>
 
-                  {/* Visual Call-to-action simulation */}
-                  <div style={{
-                    padding: '1.25rem 1.75rem',
-                    backgroundColor: 'rgba(4, 173, 222, 0.1)',
-                    border: '1px dashed #04ADDE',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem' }}>
-                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#04ADDE', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff' }}>
-                        <Zap size={22} />
+                  {/* Call-to-action simulation - Opens once boxes are selected */}
+                  {!allFieldsSelected ? (
+                    <div style={{
+                      padding: '1.15rem 1.75rem',
+                      backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                      border: '1px dashed rgba(255, 255, 255, 0.2)',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '1rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+                          <Clock size={20} />
+                        </div>
+                        <div>
+                          <div style={{ color: '#ffffff', fontWeight: 700, fontSize: '0.95rem' }}>Configure Voyage Parameters</div>
+                          <div style={{ color: '#94a3b8', fontSize: '0.82rem' }}>Click "SELECT" inside each box above to initialize vessel capacity matching</div>
+                        </div>
                       </div>
-                      <div>
-                        <div style={{ color: '#ffffff', fontWeight: 700, fontSize: '0.95rem' }}>AI Forecast Model Ready</div>
-                        <div style={{ color: '#94a3b8', fontSize: '0.82rem' }}>Synthesizing historical fixtures, FFA forward curves, and port turnaround times...</div>
-                      </div>
+                      <button
+                        onClick={handleSelectAllFields}
+                        style={{
+                          padding: '0.65rem 1.4rem',
+                          backgroundColor: '#04ADDE',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '24px',
+                          fontWeight: 800,
+                          fontSize: '0.85rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.45rem',
+                          boxShadow: '0 4px 15px rgba(4, 173, 222, 0.4)'
+                        }}
+                      >
+                        SELECT ALL <ArrowRight size={15} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleStepClick(2)}
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ duration: 0.35 }}
                       style={{
-                        padding: '0.75rem 1.6rem',
-                        backgroundColor: '#04ADDE',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '30px',
-                        fontWeight: 800,
-                        fontSize: '0.9rem',
-                        cursor: 'pointer',
+                        padding: '1.25rem 1.75rem',
+                        backgroundColor: 'rgba(4, 173, 222, 0.12)',
+                        border: '1.5px solid #04ADDE',
+                        borderRadius: '12px',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.5rem',
-                        boxShadow: '0 6px 20px rgba(4, 173, 222, 0.4)'
+                        justifyContent: 'space-between',
+                        boxShadow: '0 8px 25px rgba(4, 173, 222, 0.25)'
                       }}
                     >
-                      Calculate AI Rate <ArrowRight size={16} />
-                    </button>
-                  </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#04ADDE', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', boxShadow: '0 0 15px #04ADDE' }}>
+                          <Zap size={22} />
+                        </div>
+                        <div>
+                          <div style={{ color: '#ffffff', fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span>Fleet & Capacity Matching Ready</span>
+                            <span style={{ fontSize: '0.7rem', backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#10b981', padding: '2px 8px', borderRadius: '10px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>Parameters Confirmed ✓</span>
+                          </div>
+                          <div style={{ color: '#94a3b8', fontSize: '0.82rem' }}>
+                            Filtering verified carrier tonnage for {currentScenario.originCode} → {currentScenario.destCode} ({currentScenario.cargo})
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleStepClick(2)}
+                        style={{
+                          padding: '0.75rem 1.6rem',
+                          backgroundColor: '#04ADDE',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '30px',
+                          fontWeight: 800,
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          boxShadow: '0 6px 20px rgba(4, 173, 222, 0.4)'
+                        }}
+                      >
+                        Find Matching Vessels <ArrowRight size={16} />
+                      </button>
+                    </motion.div>
+                  )}
                 </motion.div>
               )}
 
-              {/* === STEP 2: AI FREIGHT RATE PREDICTION ENGINE === */}
+              {/* === STEP 2: CARRIER & VESSEL MATCHING (Freightos-style) === */}
               {activeStep === 2 && (
                 <motion.div
                   key="step2"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  transition={{ duration: 0.35 }}
-                  style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <span style={{ fontSize: '0.8rem', color: '#04ADDE', fontWeight: 800, letterSpacing: '0.05em' }}>STEP 2 • FREIGHT RATE INTELLIGENCE & DECISION BRIEF</span>
-                      <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ffffff', marginTop: '0.2rem' }}>AI Freight Rate Prediction Breakdown</h3>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#10b981', fontWeight: 700, fontSize: '0.85rem' }}>
-                      <ShieldCheck size={18} /> Model Confidence: {currentScenario.confidence}
-                    </div>
-                  </div>
-
-                  {/* Big Hero Rate Card */}
-                  <div style={{
-                    padding: '1.75rem 2rem',
-                    backgroundColor: '#04ADDE',
-                    background: 'linear-gradient(135deg, #04ADDE 0%, #0284c7 100%)',
-                    border: '2px solid #38bdf8',
-                    borderRadius: '16px',
-                    display: 'grid',
-                    gridTemplateColumns: '1.5fr 1fr 1fr',
-                    gap: '2rem',
-                    alignItems: 'center',
-                    boxShadow: '0 12px 35px rgba(4, 173, 222, 0.4)'
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '0.8rem', color: '#071e3d', textTransform: 'uppercase', fontWeight: 800 }}>Predicted Forward Freight Rate</div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginTop: '0.35rem' }}>
-                        <span style={{ fontSize: '3rem', fontWeight: 900, color: '#ffffff', fontFamily: "'Poppins', sans-serif" }}>
-                          {currentScenario.predictedRate}
-                        </span>
-                        <span style={{ fontSize: '1.2rem', color: '#071e3d', fontWeight: 800 }}>/ MT</span>
-                        <span style={{ fontSize: '0.9rem', color: 'rgba(255, 255, 255, 0.8)', textDecoration: 'line-through', marginLeft: '0.5rem' }}>$20.15/MT</span>
-                      </div>
-                      <div style={{ fontSize: '0.85rem', color: '#0a2540', backgroundColor: '#ffffff', padding: '4px 10px', borderRadius: '6px', fontWeight: 800, marginTop: '0.5rem', display: 'inline-block' }}>
-                        ▼ 8.6% below 30-day market average (Optimal Charter Window)
-                      </div>
-                    </div>
-
-                    <div style={{ borderLeft: '1.5px solid rgba(255,255,255,0.3)', paddingLeft: '1.5rem' }}>
-                      <div style={{ fontSize: '0.75rem', color: '#071e3d', textTransform: 'uppercase', fontWeight: 800 }}>Total Estimated Voyage Cost</div>
-                      <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#ffffff', marginTop: '0.2rem' }}>{currentScenario.totalCost}</div>
-                      <div style={{ fontSize: '0.8rem', color: '#f0f9ff', marginTop: '0.2rem', fontWeight: 600 }}>Distance: {currentScenario.distance}</div>
-                    </div>
-
-                    <div style={{ borderLeft: '1.5px solid rgba(255,255,255,0.3)', paddingLeft: '1.5rem' }}>
-                      <div style={{ fontSize: '0.75rem', color: '#071e3d', textTransform: 'uppercase', fontWeight: 800 }}>Est. Voyage Duration</div>
-                      <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#ffffff', marginTop: '0.2rem' }}>{currentScenario.transitDays}</div>
-                      <div style={{ fontSize: '0.8rem', color: '#ffffff', marginTop: '0.2rem', fontWeight: 700 }}>Speed: 13.5 kts Eco-mode</div>
-                    </div>
-                  </div>
-
-                  {/* Factor Attribution Breakdown */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
-                    {[
-                      { name: 'Base Baltic Index', val: '$16.90', impact: 'neutral' },
-                      { name: 'Bunker Fuel Surcharge', val: '+$1.40', impact: 'up' },
-                      { name: 'Port Wait Congestion', val: '+$0.60', impact: 'up' },
-                      { name: 'AI Optimization Discount', val: '-$0.50', impact: 'down' }
-                    ].map((f, i) => (
-                      <div key={i} style={{ padding: '1rem', backgroundColor: 'rgba(2, 6, 23, 0.6)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{f.name}</div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: f.impact === 'down' ? '#10b981' : f.impact === 'up' ? '#38bdf8' : '#ffffff', marginTop: '0.25rem' }}>
-                          {f.val}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-
-              {/* === STEP 3: CARRIER & VESSEL MATCHING (Freightos-style) === */}
-              {activeStep === 3 && (
-                <motion.div
-                  key="step3"
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -15 }}
@@ -780,7 +976,7 @@ const WorkflowAnimation = () => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <span style={{ fontSize: '0.8rem', color: '#04ADDE', fontWeight: 700, letterSpacing: '0.05em' }}>STEP 3 • CARRIER & VESSEL MATCHING</span>
+                      <span style={{ fontSize: '0.8rem', color: '#04ADDE', fontWeight: 700, letterSpacing: '0.05em' }}>STEP 2 • CARRIER & VESSEL MATCHING</span>
                       <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ffffff', marginTop: '0.2rem' }}>Verified Vessel Capacity & Instant Rates</h3>
                     </div>
                     <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Showing 3 Top Verified Bulk Carriers</span>
@@ -833,7 +1029,7 @@ const WorkflowAnimation = () => {
 
                     <div style={{ position: 'relative' }}>
                       <button
-                        onClick={() => handleStepClick(4)}
+                        onClick={() => handleStepClick(3)}
                         style={{
                           padding: '0.8rem 1.8rem',
                           backgroundColor: '#04ADDE',
@@ -903,7 +1099,7 @@ const WorkflowAnimation = () => {
                     </div>
 
                     <button
-                      onClick={() => handleStepClick(4)}
+                      onClick={() => handleStepClick(3)}
                       style={{
                         padding: '0.7rem 1.4rem',
                         backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -921,10 +1117,10 @@ const WorkflowAnimation = () => {
                 </motion.div>
               )}
 
-              {/* === STEP 4: INTERACTIVE ROUTE OPTIMIZATION & MAP SIMULATOR === */}
-              {activeStep === 4 && (
+              {/* === STEP 3: INTERACTIVE ROUTE OPTIMIZATION & MAP SIMULATOR === */}
+              {activeStep === 3 && (
                 <motion.div
-                  key="step4"
+                  key="step3"
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -15 }}
@@ -933,7 +1129,7 @@ const WorkflowAnimation = () => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <span style={{ fontSize: '0.8rem', color: '#04ADDE', fontWeight: 700, letterSpacing: '0.05em' }}>STEP 4 • ROUTE & SHORTCUT SIMULATOR</span>
+                      <span style={{ fontSize: '0.8rem', color: '#04ADDE', fontWeight: 700, letterSpacing: '0.05em' }}>STEP 3 • ROUTE & SHORTCUT SIMULATOR</span>
                       <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ffffff', marginTop: '0.2rem' }}>Interactive Voyage Route & Shortcut Tracking</h3>
                     </div>
                     <div style={{ padding: '0.35rem 0.9rem', borderRadius: '20px', backgroundColor: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', color: '#10b981', fontWeight: 800, fontSize: '0.8rem' }}>
@@ -1075,23 +1271,227 @@ const WorkflowAnimation = () => {
                     </div>
                   </div>
 
-                  {/* Route Comparison Bar */}
+                  {/* Route Comparison Bar with Interactive Select Buttons */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div style={{ padding: '0.9rem 1.25rem', backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div 
+                      onClick={() => setSelectedRouteType('standard')}
+                      style={{ 
+                        padding: '0.9rem 1.25rem', 
+                        backgroundColor: selectedRouteType === 'standard' ? 'rgba(239, 68, 68, 0.16)' : 'rgba(239, 68, 68, 0.08)', 
+                        border: selectedRouteType === 'standard' ? '1.5px solid #ef4444' : '1px solid rgba(239,68,68,0.3)', 
+                        borderRadius: '10px', 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: selectedRouteType === 'standard' ? '0 0 15px rgba(239, 68, 68, 0.3)' : 'none'
+                      }}
+                    >
                       <div>
                         <div style={{ fontSize: '0.75rem', color: '#f87171', fontWeight: 700 }}>Standard Route (via Malacca)</div>
                         <div style={{ fontSize: '0.9rem', color: '#ffffff', fontWeight: 600 }}>21.0 Days • High Congestion Risk</div>
                       </div>
-                      <span style={{ color: '#f87171', fontWeight: 800, fontSize: '0.9rem' }}>$1,522,000</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                        <span style={{ color: '#f87171', fontWeight: 800, fontSize: '0.9rem' }}>$1,522,000</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedRouteType('standard');
+                          }}
+                          style={{
+                            padding: '0.35rem 0.85rem',
+                            borderRadius: '20px',
+                            border: selectedRouteType === 'standard' ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.2)',
+                            backgroundColor: selectedRouteType === 'standard' ? '#ef4444' : 'rgba(255,255,255,0.1)',
+                            color: '#ffffff',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            boxShadow: selectedRouteType === 'standard' ? '0 0 10px rgba(239,68,68,0.5)' : 'none'
+                          }}
+                        >
+                          {selectedRouteType === 'standard' ? 'SELECTED ✓' : 'SELECT'}
+                        </button>
+                      </div>
                     </div>
 
-                    <div style={{ padding: '0.9rem 1.25rem', backgroundColor: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div 
+                      onClick={() => setSelectedRouteType('shortcut')}
+                      style={{ 
+                        padding: '0.9rem 1.25rem', 
+                        backgroundColor: selectedRouteType === 'shortcut' ? 'rgba(16, 185, 129, 0.18)' : 'rgba(16, 185, 129, 0.1)', 
+                        border: selectedRouteType === 'shortcut' ? '2px solid #10b981' : '1px solid rgba(16,185,129,0.4)', 
+                        borderRadius: '10px', 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: selectedRouteType === 'shortcut' ? '0 0 20px rgba(16, 185, 129, 0.35)' : 'none'
+                      }}
+                    >
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 700 }}>NAUGATI AI Optimized Shortcut</div>
+                        <div style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span>NAUGATI AI Optimized Shortcut</span>
+                          <span style={{ fontSize: '0.68rem', backgroundColor: '#10b981', color: 'white', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>RECOMMENDED</span>
+                        </div>
                         <div style={{ fontSize: '0.9rem', color: '#ffffff', fontWeight: 600 }}>{currentScenario.transitDays} • Smooth Deep-Water</div>
                       </div>
-                      <span style={{ color: '#10b981', fontWeight: 800, fontSize: '0.9rem' }}>{currentScenario.totalCost}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                        <span style={{ color: '#10b981', fontWeight: 800, fontSize: '0.9rem' }}>{currentScenario.totalCost}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedRouteType('shortcut');
+                          }}
+                          style={{
+                            padding: '0.35rem 0.85rem',
+                            borderRadius: '20px',
+                            border: selectedRouteType === 'shortcut' ? '1px solid #10b981' : '1px solid rgba(16,185,129,0.4)',
+                            backgroundColor: selectedRouteType === 'shortcut' ? '#10b981' : 'rgba(16,185,129,0.15)',
+                            color: '#ffffff',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            boxShadow: selectedRouteType === 'shortcut' ? '0 0 10px rgba(16,185,129,0.6)' : 'none'
+                          }}
+                        >
+                          {selectedRouteType === 'shortcut' ? 'SELECTED ✓' : 'SELECT'}
+                        </button>
+                      </div>
                     </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                    <button
+                      onClick={() => handleStepClick(4)}
+                      style={{
+                        padding: '0.65rem 1.5rem',
+                        backgroundColor: '#04ADDE',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '24px',
+                        fontWeight: 800,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        boxShadow: '0 4px 15px rgba(4, 173, 222, 0.4)'
+                      }}
+                    >
+                      Calculate AI Freight Rate <ArrowRight size={15} />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* === STEP 4: AI FREIGHT RATE PREDICTION ENGINE === */}
+              {activeStep === 4 && (
+                <motion.div
+                  key="step4"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.35 }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <span style={{ fontSize: '0.8rem', color: '#04ADDE', fontWeight: 800, letterSpacing: '0.05em' }}>STEP 4 • FREIGHT RATE INTELLIGENCE & DECISION BRIEF</span>
+                      <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ffffff', marginTop: '0.2rem' }}>AI Freight Rate Prediction Breakdown</h3>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#10b981', fontWeight: 700, fontSize: '0.85rem' }}>
+                      <ShieldCheck size={18} /> Model Confidence: {currentScenario.confidence}
+                    </div>
+                  </div>
+
+                  {/* Big Hero Rate Card */}
+                  <div style={{
+                    padding: '1.75rem 2rem',
+                    backgroundColor: '#04ADDE',
+                    background: 'linear-gradient(135deg, #04ADDE 0%, #0284c7 100%)',
+                    border: '2px solid #38bdf8',
+                    borderRadius: '16px',
+                    display: 'grid',
+                    gridTemplateColumns: '1.5fr 1fr 1fr',
+                    gap: '2rem',
+                    alignItems: 'center',
+                    boxShadow: '0 12px 35px rgba(4, 173, 222, 0.4)'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '0.8rem', color: '#071e3d', textTransform: 'uppercase', fontWeight: 800 }}>Predicted Forward Freight Rate</div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginTop: '0.35rem' }}>
+                        <span style={{ fontSize: '3rem', fontWeight: 900, color: '#ffffff', fontFamily: "'Poppins', sans-serif" }}>
+                          {currentScenario.predictedRate}
+                        </span>
+                        <span style={{ fontSize: '1.2rem', color: '#071e3d', fontWeight: 800 }}>/ MT</span>
+                        <span style={{ fontSize: '0.9rem', color: 'rgba(255, 255, 255, 0.8)', textDecoration: 'line-through', marginLeft: '0.5rem' }}>$20.15/MT</span>
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: '#0a2540', backgroundColor: '#ffffff', padding: '4px 10px', borderRadius: '6px', fontWeight: 800, marginTop: '0.5rem', display: 'inline-block' }}>
+                        ▼ 8.6% below 30-day market average (Optimal Charter Window)
+                      </div>
+                    </div>
+
+                    <div style={{ borderLeft: '1.5px solid rgba(255,255,255,0.3)', paddingLeft: '1.5rem' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#071e3d', textTransform: 'uppercase', fontWeight: 800 }}>Total Estimated Voyage Cost</div>
+                      <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#ffffff', marginTop: '0.2rem' }}>{currentScenario.totalCost}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#f0f9ff', marginTop: '0.2rem', fontWeight: 600 }}>Distance: {currentScenario.distance}</div>
+                    </div>
+
+                    <div style={{ borderLeft: '1.5px solid rgba(255,255,255,0.3)', paddingLeft: '1.5rem' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#071e3d', textTransform: 'uppercase', fontWeight: 800 }}>Est. Voyage Duration</div>
+                      <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#ffffff', marginTop: '0.2rem' }}>{currentScenario.transitDays}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#ffffff', marginTop: '0.2rem', fontWeight: 700 }}>Speed: 13.5 kts Eco-mode</div>
+                    </div>
+                  </div>
+
+                  {/* Factor Attribution Breakdown */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+                    {[
+                      { name: 'Base Baltic Index', val: '$16.90', impact: 'neutral' },
+                      { name: 'Bunker Fuel Surcharge', val: '+$1.40', impact: 'up' },
+                      { name: 'Port Wait Congestion', val: '+$0.60', impact: 'up' },
+                      { name: 'AI Optimization Discount', val: '-$0.50', impact: 'down' }
+                    ].map((f, i) => (
+                      <div key={i} style={{ padding: '1rem', backgroundColor: 'rgba(2, 6, 23, 0.6)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{f.name}</div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: f.impact === 'down' ? '#10b981' : f.impact === 'up' ? '#38bdf8' : '#ffffff', marginTop: '0.25rem' }}>
+                          {f.val}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                    <button
+                      onClick={() => handleStepClick(5)}
+                      style={{
+                        padding: '0.65rem 1.5rem',
+                        backgroundColor: '#04ADDE',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '24px',
+                        fontWeight: 800,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        boxShadow: '0 4px 15px rgba(4, 173, 222, 0.4)'
+                      }}
+                    >
+                      Review Executive Brief <ArrowRight size={15} />
+                    </button>
                   </div>
                 </motion.div>
               )}

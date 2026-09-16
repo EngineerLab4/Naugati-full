@@ -6,24 +6,33 @@ import {
 } from 'lucide-react';
 import { useShipment } from '../../context/ShipmentContext';
 import { contractService } from '../../services/contractService';
+import LockedGate from './LockedGate';
 
 export default function ContractRecommendation() {
   const navigate = useNavigate();
-  const { shipment, activePort, activeOrigin } = useShipment();
+  const { shipment, activePort, activeOrigin, analysisResult, hasExecuted } = useShipment();
   const [contractData, setContractData] = useState(null);
 
+  // useEffect must be before any conditional return
   useEffect(() => {
+    if (!hasExecuted || !analysisResult) return; // guard inside effect
     async function load() {
       const res = await contractService.recommendContract({
         cargoQuantity: shipment.cargoQuantity,
         frequency: "Monthly",
         marketTrend: "Rising (+5.5%)",
-        riskPreference: shipment.cargoPriority
+        riskPreference: shipment.cargoPriority,
+        baseFreightRate: analysisResult?.freight?.currentFreightUSDPerMT || 24.07
       });
       setContractData(res);
     }
     load();
-  }, [shipment.cargoQuantity, shipment.cargoPriority]);
+  }, [shipment.cargoQuantity, shipment.cargoPriority, analysisResult?.freight?.currentFreightUSDPerMT, hasExecuted, analysisResult]);
+
+  // Lock gate — after all hooks
+  if (!hasExecuted || !analysisResult) {
+    return <LockedGate pageName="Contract Strategy" />;
+  }
 
   if (!contractData) {
     return <div style={{ padding: '3rem', textAlign: 'center' }}>Analyzing contract hedging models...</div>;

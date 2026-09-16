@@ -9,6 +9,8 @@ import {
 import { VesselsService } from './vessels.service';
 import { VesselsController } from './vessels.controller';
 
+import { IntegrationsModule } from '../integrations/integrations.module';
+
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -16,6 +18,7 @@ import { VesselsController } from './vessels.controller';
       { name: VesselAvailabilityDeclaration.name, schema: VesselAvailabilityDeclarationSchema },
     ]),
     HttpModule,
+    IntegrationsModule,
   ],
   controllers: [VesselsController],
   providers: [VesselsService],

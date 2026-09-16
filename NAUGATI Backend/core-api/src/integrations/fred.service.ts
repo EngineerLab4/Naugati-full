@@ -7,6 +7,7 @@ export interface EconomicIndicatorSeries {
   latest_value: number;
   date: string;
   source: 'fred_api' | 'cached_baseline';
+  observations?: Array<{ date: string; value: number }>;
 }
 
 @Injectable()
@@ -21,23 +22,14 @@ export class FredService {
   }
 
   /**
-   * Fetches latest economic observations from the Federal Reserve Bank of St. Louis (FRED).
-   * Key series used for freight & market modeling:
-   * - DGS10: 10-Year Treasury Yield (global cost of capital)
-   * - CPIAUCSL: Consumer Price Index (macro inflation)
-   * - DTWEXBGS: Trade-Weighted U.S. Dollar Index (currency value for USD freight rates)
-   * - DCOILBRENTEU: Brent Crude Oil spot price (marine bunker fuel proxy)
+   * Official FRED REST API service method as specified in NAUGATI documentation
    */
-  async getEconomicSeries(seriesId: string): Promise<EconomicIndicatorSeries> {
+  async getFredSeries(seriesId: string): Promise<any> {
     const key = seriesId.toUpperCase().trim();
-    const cached = this.cache.get(key);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.data;
-    }
-
     const apiKey = this.getApiKey();
+
     if (!apiKey) {
-      this.logger.warn(`No FRED_API_KEY configured. Serving baseline for '${key}'.`);
+      this.logger.warn(`No FRED_API_KEY configured. Returning baseline for series '${key}'.`);
       return this.getBaselineSeries(key);
     }
 
@@ -48,37 +40,82 @@ export class FredService {
           api_key: apiKey,
           file_type: 'json',
           sort_order: 'desc',
-          limit: 5,
+          limit: 10,
         },
-        timeout: 8000,
+        timeout: 10000,
       });
 
-      const observations = response.data?.observations;
+      return response.data;
+    } catch (error: any) {
+      this.logger.error(`FRED API error for '${key}': ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Helper for Federal Funds Rate series (FEDFUNDS)
+   */
+  async getFedFunds(): Promise<EconomicIndicatorSeries> {
+    return this.getEconomicSeries('FEDFUNDS');
+  }
+
+  /**
+   * Normalized observation getter with caching and resilient fallback
+   */
+  async getEconomicSeries(seriesId: string): Promise<EconomicIndicatorSeries> {
+    const key = seriesId.toUpperCase().trim();
+    const cached = this.cache.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
+      return this.getBaselineSeries(key);
+    }
+
+    try {
+      const data = await this.getFredSeries(key);
+      const observations = data?.observations;
+
       if (Array.isArray(observations) && observations.length > 0) {
-        // Find latest non-empty observation
-        const validObs = observations.find((o) => o.value && o.value !== '.');
+        // Find latest valid numerical observation
+        const validObs = observations.find((o: any) => o.value && o.value !== '.');
         if (validObs) {
           const val = parseFloat(validObs.value);
+          const history = observations
+            .filter((o: any) => o.value && o.value !== '.')
+            .slice(0, 10)
+            .map((o: any) => ({
+              date: o.date,
+              value: parseFloat(o.value) || 0,
+            }));
+
           const result: EconomicIndicatorSeries = {
             series_id: key,
             name: this.getSeriesName(key),
             latest_value: isNaN(val) ? 4.25 : val,
             date: validObs.date,
             source: 'fred_api',
+            observations: history,
           };
+
           this.cache.set(key, { data: result, expiresAt: Date.now() + this.cacheTtlMs });
           return result;
         }
       }
     } catch (err: any) {
-      this.logger.error(`FRED API call failed for '${key}': ${err.message}`);
+      this.logger.warn(`Failed to fetch live FRED series '${key}', serving cached baseline: ${err.message}`);
     }
 
     return this.getBaselineSeries(key);
   }
 
+  /**
+   * Retrieves primary macroeconomic indicators for shipping and freight intelligence
+   */
   async getAllMacroIndicators(): Promise<Record<string, EconomicIndicatorSeries>> {
-    const series = ['DGS10', 'CPIAUCSL', 'DTWEXBGS', 'DCOILBRENTEU'];
+    const series = ['FEDFUNDS', 'DGS10', 'CPIAUCSL', 'DTWEXBGS', 'DCOILBRENTEU'];
     const results: Record<string, EconomicIndicatorSeries> = {};
     for (const s of series) {
       results[s] = await this.getEconomicSeries(s);
@@ -88,8 +125,9 @@ export class FredService {
 
   private getSeriesName(id: string): string {
     const map: Record<string, string> = {
+      FEDFUNDS: 'Federal Funds Effective Rate',
       DGS10: '10-Year Treasury Constant Maturity Rate',
-      CPIAUCSL: 'Consumer Price Index for All Urban Consumers',
+      CPIAUCSL: 'Consumer Price Index for All Urban Consumers (CPI)',
       DTWEXBGS: 'Nominal Broad U.S. Dollar Index',
       DCOILBRENTEU: 'Crude Oil Prices: Brent - Europe',
     };
@@ -98,6 +136,7 @@ export class FredService {
 
   private getBaselineSeries(id: string): EconomicIndicatorSeries {
     const baselines: Record<string, number> = {
+      FEDFUNDS: 5.33,
       DGS10: 4.18,
       CPIAUCSL: 314.8,
       DTWEXBGS: 122.4,

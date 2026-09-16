@@ -7,7 +7,7 @@ import { PredictionsService } from './predictions.service';
 export class PredictionsController {
   constructor(private readonly predictionsService: PredictionsService) {}
 
-  @ApiOperation({ summary: '1. Multi-horizon Freight Rate Forecast (1M, 3M, 6M)' })
+  @ApiOperation({ summary: '1. Multi-horizon Freight Rate Forecast (Random Forest ML)' })
   @Post('freight-rate')
   async predictFreightRate(@Body() body: any) {
     return this.predictionsService.predictFreightRate(body);
@@ -37,6 +37,30 @@ export class PredictionsController {
     return this.predictionsService.predictWeatherRisk(body);
   }
 
+  @ApiOperation({ summary: '6. Next-Day Wave Height Model (ExtraTrees ML Model - Experimental)' })
+  @Post('weather/wave-height')
+  async predictWaveHeight(@Body() body: any) {
+    return this.predictionsService.predictWaveHeight(body);
+  }
+
+  @ApiOperation({ summary: '7. Charter Optimization Engine (OR / Multi-vessel optimizer)' })
+  @Post('charter/optimize')
+  async optimizeCharter(@Body() body: any) {
+    return this.predictionsService.optimizeCharter(body);
+  }
+
+  @ApiOperation({ summary: '8. Bunker Fuel Forecast (7-day Persistence Baseline)' })
+  @Post('bunker/forecast')
+  async forecastBunker(@Body() body: any) {
+    return this.predictionsService.forecastBunker(body);
+  }
+
+  @ApiOperation({ summary: '9. Commodity Price Forecast (1-month Persistence Baseline)' })
+  @Post('commodity/forecast')
+  async forecastCommodity(@Body() body: any) {
+    return this.predictionsService.forecastCommodity(body);
+  }
+
   @ApiOperation({ summary: 'Live Commodity & Macroeconomic Market Overview' })
   @Get('market-overview')
   async getMarketOverview() {
@@ -63,5 +87,11 @@ export class PredictionsController {
       },
       timestamp: new Date().toISOString(),
     };
+  }
+
+  @ApiOperation({ summary: 'ML Models Health Status (from prediction-service)' })
+  @Get('health/models')
+  async getModelsHealth() {
+    return this.predictionsService.getModelsHealth();
   }
 }

@@ -10,34 +10,64 @@ import {
 import { useShipment } from '../../context/ShipmentContext';
 import { freightService } from '../../services/freightService';
 import { ML_MODEL_BENCHMARKS } from '../../services/demoData';
+import LockedGate from './LockedGate';
 
 export default function FreightForecast() {
-  const { shipment, updateShipment, activePort, activeOrigin } = useShipment();
-  const [selectedHorizon, setSelectedHorizon] = useState('30D'); // 7D, 14D, 30D, 90D, 1Y
+  const { shipment, updateShipment, activePort, activeOrigin, analysisResult, hasExecuted } = useShipment();
+
+  // All hooks before any conditional return
+  const [selectedHorizon, setSelectedHorizon] = useState('30D');
   const [selectedVesselClass, setSelectedVesselClass] = useState(shipment.preferredVesselType || 'Panamax');
   const [forecastData, setForecastData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (!hasExecuted || !analysisResult) return; // guard inside effect
     async function loadData() {
       setLoading(true);
-      const res = await freightService.getFreightForecast({
-        origin: shipment.origin,
-        destination: activePort.name,
-        vesselType: selectedVesselClass,
-        horizon: selectedHorizon
-      });
-      setForecastData(res);
-      setLoading(false);
+      setError(null);
+      try {
+        const res = await freightService.getFreightForecast({
+          origin: shipment.origin,
+          destination: activePort.name,
+          vesselType: selectedVesselClass,
+          horizon: selectedHorizon
+        });
+        setForecastData(res);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
-  }, [shipment.origin, activePort.name, selectedVesselClass, selectedHorizon]);
+  }, [shipment.origin, activePort?.name, selectedVesselClass, selectedHorizon, hasExecuted, analysisResult]);
 
-  if (loading || !forecastData) {
+  // Lock gate — after all hooks
+  if (!hasExecuted || !analysisResult) {
+    return <LockedGate pageName="Freight Market Intelligence" />;
+  }
+
+  if (loading) {
     return (
       <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
         <Activity size={32} className="animate-spin" style={{ margin: '0 auto 1rem', color: 'var(--primary)' }} />
-        <div>Computing econometric freight forecast models (XGBoost & SARIMA)...</div>
+        <div>Computing inference with NAUGATI Freight ML Model (Random Forest v1)...</div>
+      </div>
+    );
+  }
+
+  if (error || !forecastData) {
+    return (
+      <div style={{ padding: '2.5rem', textAlign: 'center', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', margin: '1rem 0' }}>
+        <div style={{ color: '#ef4444', fontWeight: 600, fontSize: '1.1rem', marginBottom: '0.5rem' }}>Prediction Service Unavailable</div>
+        <div style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1rem' }}>{error || 'Unable to retrieve live model inference.'}</div>
+        <button 
+          onClick={() => { setLoading(true); setError(null); }}
+          style={{ padding: '0.5rem 1rem', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+          Retry Request
+        </button>
       </div>
     );
   }

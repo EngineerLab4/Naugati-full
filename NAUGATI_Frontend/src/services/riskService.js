@@ -1,4 +1,5 @@
 import { DATA_METADATA } from './demoData';
+import { apiClient } from './apiClient';
 
 export const riskService = {
   getMetadata() {
@@ -92,21 +93,10 @@ export const riskService = {
       if (live && live.risk_level) {
         return live;
       }
-    } catch (_) {}
-    return {
-      location,
-      risk_level: "Moderate",
-      weather_risk_score: 55.0,
-      wave_height_m: 2.3,
-      swell_wave_height_m: 1.8,
-      wind_speed_knots: 18.5,
-      vessel_class: vesselType,
-      vessel_wave_threshold_m: 4.0,
-      safety_advisory: "Moderate seasonal swell: standard ballast precautions recommended; expect speed reduction of 0.5–1.0 knots.",
-      navigation_status: "CAUTION",
-      primary_risk_factors: ["Moderate ocean swell creating moderate vessel pitch"],
-      model_version: "weather_risk_live_v1",
-    };
+    } catch (err) {
+      console.error("[riskService] Live weather risk assessment failed:", err.message);
+      throw new Error(`Weather risk assessment service unavailable: ${err.message}`);
+    }
   }
 };
 

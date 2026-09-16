@@ -30,21 +30,22 @@ def predict_market_direction(req: MarketDirectionRequest):
         sma_7_to_30=sma_ratio,
     )
 
-    direction = "STABLE"
-    confidence = 0.86
-    probs = {"UP": 0.12, "DOWN": 0.08, "STABLE": 0.80}
+    if not (artifact and isinstance(artifact, dict) and "model" in artifact):
+        raise HTTPException(
+            status_code=503,
+            detail="Market direction model artifact is not loaded. No synthetic classification generated."
+        )
 
-    if artifact and isinstance(artifact, dict) and "model" in artifact:
-        model = artifact["model"]
-        feature_cols = artifact.get("feature_cols", list(feat_df.columns))
-        classes = artifact.get("classes", ["DOWN", "STABLE", "UP"])
-        
-        pred_class = model.predict(feat_df[feature_cols])[0]
-        direction = str(pred_class)
-        
-        pred_probs = model.predict_proba(feat_df[feature_cols])[0]
-        probs = {c: round(float(p), 3) for c, p in zip(classes, pred_probs)}
-        confidence = float(max(pred_probs))
+    model = artifact["model"]
+    feature_cols = artifact.get("feature_cols", list(feat_df.columns))
+    classes = artifact.get("classes", ["DOWN", "STABLE", "UP"])
+    
+    pred_class = model.predict(feat_df[feature_cols])[0]
+    direction = str(pred_class)
+    
+    pred_probs = model.predict_proba(feat_df[feature_cols])[0]
+    probs = {c: round(float(p), 3) for c, p in zip(classes, pred_probs)}
+    confidence = float(max(pred_probs))
 
     if direction == "UP":
         rationale = f"Short-term 7-day momentum for {req.commodity} is positive (+{r7*100:.1f}%), above the +1.5% volatility expansion band."

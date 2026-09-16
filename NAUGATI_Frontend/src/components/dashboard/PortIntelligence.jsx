@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Anchor, MapPin, AlertTriangle, CheckCircle, 
-  Clock, Ship, ShieldCheck, Activity, Search, ChevronRight 
+  Clock, Ship, ShieldCheck, Activity, Search, ChevronRight,
+  Cpu, Radio, Zap
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { PORTS, FLEET_VESSELS } from '../../services/demoData';
@@ -14,6 +15,12 @@ export default function PortIntelligence() {
   const [selectedVesselId, setSelectedVesselId] = useState('VES-101'); // MV Ocean Splendor
   const [searchQuery, setSearchQuery] = useState('');
   const [congestionPred, setCongestionPred] = useState(null);
+
+  useEffect(() => {
+    if (shipment.destinationPortId && shipment.destinationPortId !== selectedPortId) {
+      setSelectedPortId(shipment.destinationPortId);
+    }
+  }, [shipment.destinationPortId]);
 
   const selectedPort = PORTS.find(p => p.id === selectedPortId) || PORTS[0];
   const selectedVessel = FLEET_VESSELS.find(v => v.id === selectedVesselId) || FLEET_VESSELS[0];
@@ -161,6 +168,39 @@ export default function PortIntelligence() {
               </div>
 
               <div style={{ textAlign: 'right' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    padding: '0.15rem 0.45rem',
+                    borderRadius: '4px',
+                    backgroundColor: '#e0f2fe',
+                    color: '#0369a1',
+                    border: '1px solid #bae6fd'
+                  }}>
+                    <Cpu size={11} />
+                    {congestionPred?.model_version || 'port_congestion_v1'}
+                  </span>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    padding: '0.15rem 0.45rem',
+                    borderRadius: '4px',
+                    backgroundColor: '#f0fdf4',
+                    color: '#15803d',
+                    border: '1px solid #bbf7d0'
+                  }}>
+                    <Radio size={11} />
+                    Live AIS Stream
+                  </span>
+                </div>
+
                 <span style={{
                   display: 'inline-block',
                   padding: '0.25rem 0.75rem',
@@ -170,10 +210,10 @@ export default function PortIntelligence() {
                   backgroundColor: (congestionPred?.congestion_level || selectedPort.currentCongestion) === 'High' || (congestionPred?.congestion_level || selectedPort.currentCongestion) === 'Severe' ? 'var(--semantic-red-light)' : 'var(--semantic-green-light)',
                   color: (congestionPred?.congestion_level || selectedPort.currentCongestion) === 'High' || (congestionPred?.congestion_level || selectedPort.currentCongestion) === 'Severe' ? 'var(--semantic-red)' : 'var(--semantic-green)'
                 }}>
-                  ML: {congestionPred?.congestion_level || selectedPort.currentCongestion} Congestion ({congestionPred?.vessels_in_queue ?? selectedPort.waitingVessels} Waiting)
+                  ML: {congestionPred?.congestion_level || selectedPort.currentCongestion} Congestion ({congestionPred?.vessels_in_queue ?? selectedPort.waitingVessels} in queue)
                 </span>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.3rem' }}>
-                  Predicted Wait: <strong>{congestionPred?.average_waiting_hours ? `${congestionPred.average_waiting_hours}h (${congestionPred.average_waiting_days}d)` : `${selectedPort.averageTurnaroundHours} Hours`}</strong>
+                  ML Predicted Wait: <strong>{congestionPred?.average_waiting_hours ? `${congestionPred.average_waiting_hours}h (${congestionPred.average_waiting_days}d)` : `${selectedPort.averageTurnaroundHours} Hours`}</strong>
                 </div>
               </div>
             </div>
@@ -202,9 +242,24 @@ export default function PortIntelligence() {
               </div>
             </div>
 
-            {/* Navigation Restrictions */}
-            <div style={{ fontSize: '0.8rem', color: '#475569', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', padding: '0.75rem 1rem', borderRadius: '6px' }}>
-              <strong>Operational Advisory:</strong> {selectedPort.restrictions}
+            {/* Live ML Prediction & Telemetry Advisory */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {congestionPred?.delay_risk && (
+                <div style={{ fontSize: '0.82rem', color: '#0369a1', backgroundColor: '#f0f9ff', border: '1px solid #bae6fd', padding: '0.75rem 1rem', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Zap size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+                  <div>
+                    <strong>AI Congestion Forecast:</strong> {congestionPred.delay_risk}
+                    <span style={{ marginLeft: '0.5rem', fontSize: '0.74rem', color: '#0284c7', opacity: 0.9 }}>
+                      (Dual Random Forest • {Math.round((congestionPred.confidence || 0.85) * 100)}% Confidence • Score: {congestionPred.congestion_score}/100)
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Navigation Restrictions */}
+              <div style={{ fontSize: '0.8rem', color: '#475569', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', padding: '0.75rem 1rem', borderRadius: '6px' }}>
+                <strong>Port Infrastructure Advisory:</strong> {selectedPort.restrictions}
+              </div>
             </div>
           </div>
 

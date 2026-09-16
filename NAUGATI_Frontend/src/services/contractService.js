@@ -9,17 +9,19 @@ export const contractService = {
     cargoQuantity = 75000,
     frequency = "Monthly",
     marketTrend = "Rising",
-    riskPreference = "Balanced"
+    riskPreference = "Balanced",
+    baseFreightRate = 24.07
   }) {
-    // Decision logic based on prompt specifications:
-    // High volatility + repeated cargo -> Short/Medium term
-    // Stable market + flexible cargo -> Spot
-    // Predictable large volume + uncertainty -> Long-term COA
+    const rate = Number(baseFreightRate) || 24.07;
+    const spotCost = `$${rate.toFixed(2)} / MT`;
+    const shortTermCost = `$${(rate * 0.98).toFixed(2)} / MT`;
+    const mediumTermCost = `$${Math.round(rate * 680).toLocaleString()} / Day (TCE)`;
+    const coaCost = `$${(rate * 0.94).toFixed(2)} / MT Fixed + BAF`;
 
     const contracts = [
       {
         type: "Spot Voyage Charter",
-        cost: "$31.40 / MT",
+        cost: spotCost,
         flexibility: "High",
         risk: "High (Exposed to spot freight inflation)",
         stability: "Low",
@@ -30,7 +32,7 @@ export const contractService = {
       },
       {
         type: "Short-Term Multiple Voyage (3-6 Months)",
-        cost: "$30.85 / MT",
+        cost: shortTermCost,
         flexibility: "Moderate",
         risk: "Low-Medium (Hedges near-term rate spikes)",
         stability: "High",
@@ -41,7 +43,7 @@ export const contractService = {
       },
       {
         type: "Medium-Term Time Charter (6-12 Months)",
-        cost: "$16,500 / Day (TCE)",
+        cost: mediumTermCost,
         flexibility: "High (Operational control)",
         risk: "Medium (Bunker price exposure)",
         stability: "High",
@@ -52,7 +54,7 @@ export const contractService = {
       },
       {
         type: "Long-Term Contract of Affreightment (COA)",
-        cost: "$29.70 / MT Fixed + Bunker Adjustment Factor",
+        cost: coaCost,
         flexibility: "Low",
         risk: "Low",
         stability: "Maximum",

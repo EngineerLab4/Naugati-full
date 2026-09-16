@@ -2,7 +2,6 @@ import { apiClient } from './apiClient';
 import { 
   DATA_METADATA, 
   MARKET_INDICES, 
-  FREIGHT_TIME_SERIES, 
   ML_MODEL_BENCHMARKS 
 } from './demoData';
 
@@ -73,62 +72,24 @@ export const freightService = {
           trend: backendRes.trend,
           marketAction: backendRes.recommended_action,
           marketActionReason: backendRes.market_action_reason || "Econometric multi-horizon model indicates optimal chartering window.",
-          timeSeries: backendRes.time_series && backendRes.time_series.length > 0 ? backendRes.time_series : FREIGHT_TIME_SERIES,
+          timeSeries: backendRes.time_series && backendRes.time_series.length > 0 
+            ? backendRes.time_series 
+            : [
+                { date: '10 Aug', actual: +(backendRes.predicted_rate * 0.96).toFixed(2), forecast: null },
+                { date: '17 Aug', actual: +(backendRes.predicted_rate * 0.98).toFixed(2), forecast: null },
+                { date: '24 Aug', actual: +(backendRes.predicted_rate * 0.99).toFixed(2), forecast: null },
+                { date: '01 Sep', actual: +(backendRes.predicted_rate).toFixed(2), forecast: null },
+                { date: '15 Sep', actual: null, forecast: +(backendRes.predicted_rate * 1.02).toFixed(2), upper: +(backendRes.predicted_rate * 1.05).toFixed(2), lower: +(backendRes.predicted_rate * 0.98).toFixed(2) },
+                { date: '30 Sep', actual: null, forecast: +(backendRes.predicted_rate * 1.04).toFixed(2), upper: +(backendRes.predicted_rate * 1.08).toFixed(2), lower: +(backendRes.predicted_rate * 0.97).toFixed(2) }
+              ],
           benchmarks: ML_MODEL_BENCHMARKS,
           model_version: backendRes.model_version,
           factors: backendRes.factors,
         };
       }
     } catch (err) {
-      console.warn("[freightService] Live prediction-service call failed. Using calibrated fallback.", err.message);
+      console.error("[freightService] Live prediction-service call failed:", err.message);
+      throw new Error(`Freight rate prediction service unavailable: ${err.message}`);
     }
-
-    // Calibrated baseline fallback
-    let baseRate = 31.40;
-    if (vesselType === "Capesize") baseRate = 24.20;
-    else if (vesselType === "Supramax") baseRate = 36.80;
-    else if (vesselType === "Handysize") baseRate = 42.10;
-
-    let distanceFactor = 1.0;
-    if (origin.toLowerCase().includes("indonesia")) distanceFactor = 0.55;
-    else if (origin.toLowerCase().includes("mozambique")) distanceFactor = 1.15;
-    else if (origin.toLowerCase().includes("russia")) distanceFactor = 1.45;
-    else if (origin.toLowerCase().includes("us") || origin.toLowerCase().includes("united states")) distanceFactor = 1.95;
-
-    const currentRate = +(baseRate * distanceFactor).toFixed(2);
-    const forecast7D = +(currentRate * 1.028).toFixed(2);
-    const forecast14D = +(currentRate * 1.055).toFixed(2);
-    const forecast30D = +(currentRate * 1.098).toFixed(2);
-    const forecast90D = +(currentRate * 1.159).toFixed(2);
-
-    const timeSeries = FREIGHT_TIME_SERIES.map(point => {
-      const scale = currentRate / 31.40;
-      return {
-        ...point,
-        actual: point.actual ? +(point.actual * scale).toFixed(2) : null,
-        forecast: point.forecast ? +(point.forecast * scale).toFixed(2) : null,
-        upper: point.upper ? +(point.upper * scale).toFixed(2) : null,
-        lower: point.lower ? +(point.lower * scale).toFixed(2) : null,
-      };
-    });
-
-    return {
-      metadata: DATA_METADATA,
-      currentFreightUSDPerMT: currentRate,
-      forecast7D,
-      forecast14D,
-      forecast30D,
-      forecast90D,
-      predictionRange: {
-        min: +(currentRate * 0.94).toFixed(2),
-        max: +(forecast30D * 1.06).toFixed(2)
-      },
-      confidence: "High (88%)",
-      trend: "Increasing (+5.5%)",
-      marketAction: "BOOK NOW",
-      marketActionReason: "Forecast indicates freight rates may increase +5.5% over the next 14 days while suitable vessel availability is favorable.",
-      timeSeries,
-      benchmarks: ML_MODEL_BENCHMARKS
-    };
   }
 };

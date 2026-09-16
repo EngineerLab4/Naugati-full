@@ -6,13 +6,16 @@ import {
 } from 'lucide-react';
 import { useShipment } from '../../context/ShipmentContext';
 import { riskService } from '../../services/riskService';
+import LockedGate from './LockedGate';
 
 export default function RiskIntelligence() {
   const navigate = useNavigate();
-  const { shipment, activePort, activeOrigin } = useShipment();
+  const { shipment, activePort, activeOrigin, hasExecuted, analysisResult } = useShipment();
   const [riskData, setRiskData] = useState(null);
 
+  // useEffect must be before any conditional return
   useEffect(() => {
+    if (!hasExecuted || !analysisResult) return; // guard inside effect
     async function load() {
       const res = await riskService.getRiskAssessment({
         portId: shipment.destinationPortId,
@@ -22,7 +25,12 @@ export default function RiskIntelligence() {
       setRiskData(res);
     }
     load();
-  }, [shipment.destinationPortId, shipment.preferredVesselType, shipment.origin]);
+  }, [shipment.destinationPortId, shipment.preferredVesselType, shipment.origin, hasExecuted, analysisResult]);
+
+  // Lock gate — after all hooks
+  if (!hasExecuted || !analysisResult) {
+    return <LockedGate pageName="Risk & Geopolitical Intelligence" />;
+  }
 
   if (!riskData) {
     return <div style={{ padding: '3rem', textAlign: 'center' }}>Compiling multi-source risk indices...</div>;

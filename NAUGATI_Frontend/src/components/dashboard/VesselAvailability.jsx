@@ -6,11 +6,13 @@ import {
 } from 'lucide-react';
 import { useShipment } from '../../context/ShipmentContext';
 import { vesselService } from '../../services/vesselService';
+import LockedGate from './LockedGate';
 
 export default function VesselAvailability() {
   const navigate = useNavigate();
-  const { shipment, updateShipment, activePort } = useShipment();
+  const { shipment, updateShipment, activePort, hasExecuted, analysisResult } = useShipment();
 
+  // All hooks before any conditional return
   const [filterType, setFilterType] = useState('All');
   const [minScore, setMinScore] = useState(70);
   const [sortBy, setSortBy] = useState('Best Match');
@@ -18,6 +20,7 @@ export default function VesselAvailability() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!hasExecuted || !analysisResult) return; // guard inside effect
     async function load() {
       setLoading(true);
       const res = await vesselService.matchVesselsForCargo({
@@ -45,7 +48,12 @@ export default function VesselAvailability() {
       setLoading(false);
     }
     load();
-  }, [shipment.cargoQuantity, shipment.destinationPortId, shipment.cargoPriority, filterType, minScore, sortBy]);
+  }, [shipment.cargoQuantity, shipment.destinationPortId, shipment.cargoPriority, filterType, minScore, sortBy, hasExecuted, analysisResult]);
+
+  // Lock gate — after all hooks
+  if (!hasExecuted || !analysisResult) {
+    return <LockedGate pageName="Vessel Matching" />;
+  }
 
   const handleSelectVessel = (vessel) => {
     updateShipment({ preferredVesselType: vessel.type });

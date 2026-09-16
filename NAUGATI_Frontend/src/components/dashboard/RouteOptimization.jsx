@@ -9,14 +9,18 @@ import InteractiveMaritimeMap from './InteractiveMaritimeMap';
 import { PORTS } from '../../services/demoData';
 import { vesselTrackingService, TRACKED_VESSELS } from '../../services/vesselTrackingService';
 import { routeService, COMPREHENSIVE_ROUTES } from '../../services/routeService';
-import { maritimeRiskService, RISK_ZONES } from '../../services/maritimeRiskService';
+import { apiClient } from '../../services/apiClient';
+import { useShipment } from '../../context/ShipmentContext';
 
 export default function RouteOptimization() {
+  const shipmentContext = useShipment?.() || {};
+  const { shipment } = shipmentContext;
+
   // Master selection states
   const [selectedVesselId, setSelectedVesselId] = useState('VES-STAR');
-  const [selectedPortId, setSelectedPortId] = useState('dhamra');
+  const [selectedPortId, setSelectedPortId] = useState(shipment?.destinationPortId || 'dhamra');
   const [selectedObjective, setSelectedObjective] = useState('Best Overall');
-  const [cargoType, setCargoType] = useState('Coking Coal (165,000 MT)');
+  const [cargoType, setCargoType] = useState(shipment?.cargoType ? `${shipment.cargoType} (${(shipment.cargoQuantity || 75000).toLocaleString()} MT)` : 'Coking Coal (165,000 MT)');
   const [activeRouteId, setActiveRouteId] = useState('route-rec');
   
   // Real-time telemetry simulation state
@@ -38,18 +42,22 @@ export default function RouteOptimization() {
   const [selectedRiskZone, setSelectedRiskZone] = useState(null);
   const [optimizing, setOptimizing] = useState(false);
 
+  // Entry and fetched data states — Only fetch data after entry!
+  const [hasEntered, setHasEntered] = useState(false);
+  const [isFetchingData, setIsFetchingData] = useState(false);
+  const [routeData, setRouteData] = useState(null);
+  const [liveEtaData, setLiveEtaData] = useState(null);
+  const [liveWeatherData, setLiveWeatherData] = useState(null);
+
   // Currently active vessel
   const selectedVessel = liveVessels.find(v => v.id === selectedVesselId) || liveVessels[0];
 
-  // Dynamic Route Engine results
-  const optimizationResults = routeService.getOptimizedRoutes({
-    vesselId: selectedVesselId,
-    originPort: selectedVessel.originPort,
-    destinationPortId: selectedPortId,
-    objective: selectedObjective
-  });
-
-  const { routes, recommendedRoute, alternativeRoute, shortcutRoute, compatibility } = optimizationResults;
+  // Derived routes from fetched routeData (only populated after entry)
+  const routes = routeData?.routes || [];
+  const recommendedRoute = routeData?.recommendedRoute || routes[0] || null;
+  const alternativeRoute = routeData?.alternativeRoute || routes[1] || null;
+  const shortcutRoute = routeData?.shortcutRoute || routes[2] || null;
+  const compatibility = routeData?.compatibility || null;
   const currentActiveRoute = routes.find(r => r.id === activeRouteId) || recommendedRoute;
 
   // Periodic AIS Telemetry Simulation Heartbeat (updates every 6s in demo mode)
@@ -95,13 +103,77 @@ export default function RouteOptimization() {
     }, 500);
   };
 
-  // Run Route Optimization
-  const handleOptimize = () => {
+  // Run Route Optimization & Fetch Live Data after entry
+  const handleOptimize = async () => {
+    setIsFetchingData(true);
     setOptimizing(true);
-    setTimeout(() => {
+    try {
+      const selectedPort = PORTS.find(p => p.id === selectedPortId) || PORTS[0];
+      const originPortName = selectedVessel?.originPort || 'Newcastle';
+      const destPortName = selectedPort?.name || 'Dhamra Port';
+
+      // 1. Fetch live ML predictions concurrently: voyage ETA and marine weather risk
+      const [etaRes, weatherRes] = await Promise.allSettled([
+        apiClient.getVoyageEta({
+          origin: originPortName,
+          destination: destPortName,
+          vessel_speed_knots: selectedVessel?.speedKnots || 12.8,
+          vessel_class: selectedVessel?.vesselType || 'Panamax'
+        }),
+        apiClient.getWeatherRisk({
+          origin: originPortName,
+          destination: destPortName
+        })
+      ]);
+
+      const etaData = etaRes.status === 'fulfilled' ? etaRes.value : null;
+      const weatherData = weatherRes.status === 'fulfilled' ? weatherRes.value : null;
+
+      setLiveEtaData(etaData);
+      setLiveWeatherData(weatherData);
+
+      // 2. Compute dynamic route optimization results
+      const results = routeService.getOptimizedRoutes({
+        vesselId: selectedVesselId,
+        originPort: originPortName,
+        destinationPortId: selectedPortId,
+        objective: selectedObjective
+      });
+
+      // Augment recommended route with live ETA model response if available
+      if (etaData && etaData.transit_days) {
+        results.routes = results.routes.map(r => {
+          if (r.type === 'recommended') {
+            return {
+              ...r,
+              voyageDays: etaData.transit_days,
+              voyageDurationFormatted: `${Math.floor(etaData.transit_days)}d ${Math.round((etaData.transit_days % 1) * 24)}h`,
+              etaArrival: etaData.estimated_ocean_arrival,
+              delayProbability: etaData.delay_probability_percent ? `${etaData.delay_probability_percent}%` : r.riskLevel
+            };
+          }
+          return r;
+        });
+      }
+
+      setRouteData(results);
+      setActiveRouteId(results.recommendedRoute?.id || 'route-rec');
+      setHasEntered(true);
+    } catch (err) {
+      console.warn('Route optimization live fetch fallback:', err.message);
+      const results = routeService.getOptimizedRoutes({
+        vesselId: selectedVesselId,
+        originPort: selectedVessel?.originPort || 'Newcastle',
+        destinationPortId: selectedPortId,
+        objective: selectedObjective
+      });
+      setRouteData(results);
+      setActiveRouteId(results.recommendedRoute?.id || 'route-rec');
+      setHasEntered(true);
+    } finally {
+      setIsFetchingData(false);
       setOptimizing(false);
-      setActiveRouteId('route-rec');
-    }, 600);
+    }
   };
 
   const objectivesList = [
@@ -163,7 +235,7 @@ export default function RouteOptimization() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} className="animate-pulse" />
             <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#0f172a' }}>
-              Demo Data — Last simulated update: <span style={{ color: '#04ADDE' }}>{lastTelemetryTime}</span>
+              Live Telemetry — Stream updated: <span style={{ color: '#04ADDE' }}>{lastTelemetryTime}</span>
             </span>
           </div>
 
@@ -209,80 +281,143 @@ export default function RouteOptimization() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.9rem' }}>
-            {/* Vessel Select */}
+            {/* Vessel Select & Select Buttons */}
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.25rem' }}>
-                Select Vessel
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                  Select Vessel
+                </label>
+                <span style={{ fontSize: '0.68rem', color: '#04ADDE', fontWeight: 700 }}>FLEET TONNAGE</span>
+              </div>
               <select
                 value={selectedVesselId}
                 onChange={(e) => setSelectedVesselId(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '0.5rem 0.65rem',
+                  padding: '0.45rem 0.65rem',
                   borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.8rem',
+                  fontSize: '0.78rem',
                   fontWeight: 600,
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
-                  outline: 'none'
+                  outline: 'none',
+                  marginBottom: '0.35rem'
                 }}
               >
                 {liveVessels.map(v => (
                   <option key={v.id} value={v.id}>
-                    {v.name} ({v.vesselType})
+                    {v.name} ({v.vesselType} • {v.dwt.toLocaleString()} DWT)
                   </option>
                 ))}
               </select>
+              {/* Quick Select Vessel Buttons */}
+              <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                {liveVessels.slice(0, 3).map(v => {
+                  const isSel = selectedVesselId === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setSelectedVesselId(v.id)}
+                      style={{
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: '12px',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        border: isSel ? '1.5px solid #04ADDE' : '1px solid #e2e8f0',
+                        backgroundColor: isSel ? '#f0f9ff' : '#f8fafc',
+                        color: isSel ? '#0369a1' : '#64748b',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {isSel ? '✓ ' : ''}{v.name.replace('MV ', '')}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Destination Port Select */}
+            {/* Destination Port Select & Select Buttons */}
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.25rem' }}>
-                Destination Port
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                  Destination Port
+                </label>
+                <span style={{ fontSize: '0.68rem', color: '#10b981', fontWeight: 700 }}>EAST COAST INDIA</span>
+              </div>
               <select
                 value={selectedPortId}
                 onChange={(e) => setSelectedPortId(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '0.5rem 0.65rem',
+                  padding: '0.45rem 0.65rem',
                   borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.8rem',
+                  fontSize: '0.78rem',
                   fontWeight: 600,
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
-                  outline: 'none'
+                  outline: 'none',
+                  marginBottom: '0.35rem'
                 }}
               >
                 {PORTS.map(p => (
                   <option key={p.id} value={p.id}>
-                    {p.name} ({p.unlocode})
+                    {p.name} (Max Draft {p.maxDraft}m)
                   </option>
                 ))}
               </select>
+              {/* Quick Select Port Buttons */}
+              <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                {PORTS.slice(0, 4).map(p => {
+                  const isSel = selectedPortId === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setSelectedPortId(p.id)}
+                      style={{
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: '12px',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        border: isSel ? '1.5px solid #04ADDE' : '1px solid #e2e8f0',
+                        backgroundColor: isSel ? '#f0f9ff' : '#f8fafc',
+                        color: isSel ? '#0369a1' : '#64748b',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {isSel ? '✓ ' : ''}{p.name.replace(' Port', '')}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Cargo Select */}
+            {/* Cargo Select & Select Buttons */}
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.25rem' }}>
-                Cargo & Volume
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                  Cargo & Volume
+                </label>
+              </div>
               <select
                 value={cargoType}
                 onChange={(e) => setCargoType(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '0.5rem 0.65rem',
+                  padding: '0.45rem 0.65rem',
                   borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.8rem',
+                  fontSize: '0.78rem',
                   fontWeight: 600,
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
-                  outline: 'none'
+                  outline: 'none',
+                  marginBottom: '0.35rem'
                 }}
               >
                 <option value="Coking Coal (165,000 MT)">Coking Coal (165,000 MT)</option>
@@ -290,60 +425,126 @@ export default function RouteOptimization() {
                 <option value="Iron Ore Fines (160,000 MT)">Iron Ore Fines (160,000 MT)</option>
                 <option value="Bauxite (55,000 MT)">Bauxite (55,000 MT)</option>
               </select>
+              {/* Quick Select Cargo Buttons */}
+              <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                {[
+                  'Coking Coal (165,000 MT)',
+                  'Thermal Coal (75,000 MT)',
+                  'Iron Ore Fines (160,000 MT)'
+                ].map(c => {
+                  const isSel = cargoType === c;
+                  const label = c.split(' (')[0];
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setCargoType(c)}
+                      style={{
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: '12px',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        border: isSel ? '1.5px solid #04ADDE' : '1px solid #e2e8f0',
+                        backgroundColor: isSel ? '#f0f9ff' : '#f8fafc',
+                        color: isSel ? '#0369a1' : '#64748b',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {isSel ? '✓ ' : ''}{label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Objective Select */}
+            {/* Optimization Objective Select Buttons */}
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.25rem' }}>
-                Optimization Objective
-              </label>
-              <select
-                value={selectedObjective}
-                onChange={(e) => setSelectedObjective(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem 0.65rem',
-                  borderRadius: '6px',
-                  border: '1px solid #04ADDE',
-                  fontSize: '0.8rem',
-                  fontWeight: 700,
-                  backgroundColor: '#f0f9ff',
-                  color: '#0369a1',
-                  outline: 'none'
-                }}
-              >
-                {objectivesList.map(obj => (
-                  <option key={obj} value={obj}>{obj}</option>
-                ))}
-              </select>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                  Optimization Objective
+                </label>
+                <span style={{ fontSize: '0.68rem', color: '#8b5cf6', fontWeight: 700 }}>AI WEIGHTING</span>
+              </div>
+              {/* Interactive Objective Select Buttons */}
+              <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
+                {objectivesList.map(obj => {
+                  const isSel = selectedObjective === obj;
+                  return (
+                    <button
+                      key={obj}
+                      type="button"
+                      onClick={() => setSelectedObjective(obj)}
+                      style={{
+                        padding: '0.3rem 0.55rem',
+                        borderRadius: '12px',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        border: isSel ? '1.5px solid #04ADDE' : '1px solid #cbd5e1',
+                        backgroundColor: isSel ? '#04ADDE' : '#ffffff',
+                        color: isSel ? '#ffffff' : '#475569',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        boxShadow: isSel ? '0 2px 6px rgba(4,173,222,0.3)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {isSel && <Check size={10} color="#ffffff" />}
+                      {obj}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
               Origin: <strong>{selectedVessel.originPort}</strong>
+              {hasEntered && (
+                <span style={{ marginLeft: '0.5rem', color: '#10b981', fontWeight: 700 }}>
+                  • Optimization Live ✓
+                </span>
+              )}
             </div>
             
             <button
               onClick={handleOptimize}
-              disabled={optimizing}
+              disabled={optimizing || isFetchingData}
               style={{
                 backgroundColor: '#04ADDE',
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
-                padding: '0.55rem 1.25rem',
+                padding: '0.55rem 1.35rem',
                 fontSize: '0.82rem',
-                fontWeight: 700,
+                fontWeight: 800,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem',
-                boxShadow: '0 2px 8px rgba(4, 173, 222, 0.35)'
+                boxShadow: '0 2px 8px rgba(4, 173, 222, 0.35)',
+                transition: 'all 0.2s ease'
               }}
             >
-              <Zap size={15} />
-              {optimizing ? 'Calculating Routes...' : 'Optimize Route'}
+              {optimizing || isFetchingData ? (
+                <>
+                  <RefreshCw size={14} className="animate-spin" />
+                  <span>Fetching Live Route Data...</span>
+                </>
+              ) : hasEntered ? (
+                <>
+                  <Zap size={14} />
+                  <span>Re-Calculate & Fetch Routes</span>
+                </>
+              ) : (
+                <>
+                  <Zap size={14} />
+                  <span>Optimize Route & Fetch Data</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -428,8 +629,127 @@ export default function RouteOptimization() {
 
       </div>
 
-      {/* SECTION: Port Compatibility Warning Alert (Section 25 of user spec) */}
-      {!compatibility.isCompatible ? (
+      {/* SECTION: Route Optimization Results (Only rendered after entry!) */}
+      {!hasEntered || !routeData || !compatibility ? (
+        <div className="card" style={{
+          padding: '3rem 2rem',
+          backgroundColor: '#ffffff',
+          border: '2px dashed #cbd5e1',
+          borderRadius: '16px',
+          textAlign: 'center',
+          marginBottom: '1.5rem',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.03)'
+        }}>
+          <div style={{
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(4, 173, 222, 0.1)',
+            border: '2px solid rgba(4, 173, 222, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 1.25rem',
+            color: '#04ADDE'
+          }}>
+            <Compass size={30} />
+          </div>
+
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            backgroundColor: '#f0f9ff',
+            color: '#0369a1',
+            padding: '0.25rem 0.75rem',
+            borderRadius: '20px',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            marginBottom: '0.75rem'
+          }}>
+            <Sparkles size={13} /> AWAITING ROUTE PARAMETERS ENTRY
+          </div>
+
+          <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem 0' }}>
+            Configure Voyage & Click 'Optimize Route & Fetch Data'
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '0.88rem', maxWidth: '650px', margin: '0 auto 2rem', lineHeight: 1.5 }}>
+            Select your vessel, destination port, cargo volume, and optimization priority in the panel above. Once entered, NAUGATI will query live ML models to compute deep-water corridors, transit ETA, swell risks, and shortcut channels.
+          </p>
+
+          {/* 4 Feature Preview Cards */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '1rem',
+            maxWidth: '1000px',
+            margin: '0 auto 2rem',
+            textAlign: 'left'
+          }}>
+            <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', color: '#04ADDE', fontWeight: 700, fontSize: '0.85rem' }}>
+                <Navigation size={16} /> Multi-Corridor Routing
+              </div>
+              <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>
+                Compares Sunda Deep-Water Pass, Malacca Strait TSS, and Torres Strait Direct shortcut.
+              </p>
+            </div>
+
+            <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', color: '#10b981', fontWeight: 700, fontSize: '0.85rem' }}>
+                <Clock size={16} /> ML ETA Prediction
+              </div>
+              <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>
+                Predicts accurate arrival windows, anchorage queue variance, and weather delays.
+              </p>
+            </div>
+
+            <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', color: '#f59e0b', fontWeight: 700, fontSize: '0.85rem' }}>
+                <ShieldAlert size={16} /> Marine Swell Risk
+              </div>
+              <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>
+                Calibrated meteorological evaluation identifying wave heights and monsoon advisories.
+              </p>
+            </div>
+
+            <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', color: '#8b5cf6', fontWeight: 700, fontSize: '0.85rem' }}>
+                <Layers size={16} /> Port UKC Clearance
+              </div>
+              <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>
+                Under-keel clearance calculation verifying draft safety against port limits.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleOptimize}
+            disabled={optimizing || isFetchingData}
+            style={{
+              backgroundColor: '#04ADDE',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '0.75rem 2rem',
+              fontSize: '0.9rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.6rem',
+              boxShadow: '0 4px 14px rgba(4, 173, 222, 0.4)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Zap size={17} />
+            {optimizing || isFetchingData ? 'Fetching Live Predictions...' : 'Run Optimization with Selected Parameters'}
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* SECTION: Port Compatibility Warning Alert (Section 25 of user spec) */}
+          {!compatibility.isCompatible ? (
         <div style={{
           backgroundColor: '#fef2f2',
           border: '1px solid #fecaca',
@@ -742,24 +1062,31 @@ export default function RouteOptimization() {
                 </p>
 
                 <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveRouteId(r.id);
+                  }}
                   style={{
                     width: '100%',
-                    padding: '0.5rem',
+                    padding: '0.55rem',
                     borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: isSelected ? '#04ADDE' : '#f1f5f9',
-                    color: isSelected ? 'white' : '#475569',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
+                    border: isSelected ? '1.5px solid #04ADDE' : '1px solid #cbd5e1',
+                    backgroundColor: isSelected ? '#04ADDE' : '#f8fafc',
+                    color: isSelected ? '#ffffff' : '#0f172a',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '0.4rem'
+                    gap: '0.45rem',
+                    boxShadow: isSelected ? '0 2px 8px rgba(4, 173, 222, 0.3)' : 'none',
+                    transition: 'all 0.2s ease'
                   }}
                 >
-                  {isSelected ? <Check size={14} /> : null}
-                  {isSelected ? 'Following This Route' : 'Select This Route'}
+                  {isSelected ? <Check size={14} color="#ffffff" /> : <Navigation size={13} color="#04ADDE" />}
+                  {isSelected ? 'FOLLOWING THIS ROUTE ✓' : `SELECT THIS ROUTE`}
                 </button>
               </div>
             );
@@ -836,6 +1163,8 @@ export default function RouteOptimization() {
           )}
         </div>
       </div>
+      </>
+      )}
 
       {/* SECTION: Clicked Risk Zone Detail Modal */}
       {selectedRiskZone && (

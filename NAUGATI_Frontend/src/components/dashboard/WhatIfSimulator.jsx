@@ -6,27 +6,58 @@ import {
 } from 'lucide-react';
 import { useShipment } from '../../context/ShipmentContext';
 import { PORTS, ORIGINS } from '../../services/demoData';
+import LockedGate from './LockedGate';
 
 export default function WhatIfSimulator() {
   const navigate = useNavigate();
-  const { shipment, updateShipment, activePort, activeOrigin, whatIfParams, updateWhatIf, resetWhatIf, analysisResult } = useShipment();
+  const { 
+    shipment, 
+    updateShipment, 
+    activePort, 
+    activeOrigin, 
+    whatIfParams, 
+    updateWhatIf, 
+    resetWhatIf, 
+    analysisResult,
+    hasExecuted,
+    runShipmentAnalysis 
+  } = useShipment();
 
-  // Local interactive controls state
+  // All hooks must be declared before any conditional return
   const [congestionDelta, setCongestionDelta] = useState(whatIfParams.congestionChangePercent || 0);
   const [fuelDelta, setFuelDelta] = useState(whatIfParams.fuelPriceChangePercent || 0);
-  const [simQuantity, setSimQuantity] = useState(shipment.cargoQuantity);
+  const [simQuantity, setSimQuantity] = useState(shipment.cargoQuantity || 75000);
   const [simVesselType, setSimVesselType] = useState(shipment.preferredVesselType || 'Panamax');
+  const [applying, setApplying] = useState(false);
 
-  const handleApplySimulation = () => {
-    updateWhatIf({
-      congestionChangePercent: congestionDelta,
-      fuelPriceChangePercent: fuelDelta,
-      cargoQuantityOverride: simQuantity
-    });
-    updateShipment({
-      preferredVesselType: simVesselType,
-      cargoQuantity: simQuantity
-    });
+  // Lock gate — only accessible after cargo form + ML pipeline run
+  if (!hasExecuted || !analysisResult) {
+    return <LockedGate pageName="What-If Simulator" />;
+  }
+
+  const handleApplySimulation = async () => {
+    setApplying(true);
+    try {
+      updateWhatIf({
+        congestionChangePercent: congestionDelta,
+        fuelPriceChangePercent: fuelDelta,
+        cargoQuantityOverride: simQuantity
+      });
+      updateShipment({
+        preferredVesselType: simVesselType,
+        cargoQuantity: simQuantity
+      });
+      await runShipmentAnalysis({
+        cargoQuantity: simQuantity,
+        preferredVesselType: simVesselType,
+        bunkerPriceUSD: 600 * (1 + fuelDelta / 100)
+      });
+      navigate('/dashboard');
+    } catch (err) {
+      console.error("Simulation recalculation failed:", err);
+    } finally {
+      setApplying(false);
+    }
   };
 
   const handleReset = () => {
@@ -38,15 +69,15 @@ export default function WhatIfSimulator() {
   };
 
   // Recalculated dynamic impact preview
-  const baseWaitingDays = activePort.averageWaitingTimeDays;
+  const baseWaitingDays = activePort?.averageWaitingTimeDays || 2.5;
   const simulatedWaitingDays = +(baseWaitingDays * (1 + congestionDelta / 100)).toFixed(1);
   const addedDelayDays = +(simulatedWaitingDays - baseWaitingDays).toFixed(1);
 
-  const baseFuelCost = analysisResult?.routesData?.recommendedRoute?.estimatedFuelCostUSD || 257000;
+  const baseFuelCost = analysisResult?.chosenVessel?.fuelCostUSD || 630000;
   const simulatedFuelCost = Math.round(baseFuelCost * (1 + fuelDelta / 100));
   const fuelCostDelta = simulatedFuelCost - baseFuelCost;
 
-  const baseRate = analysisResult?.freight?.currentFreightUSDPerMT || 31.40;
+  const baseRate = analysisResult?.freight?.currentFreightUSDPerMT || 24.07;
   const simulatedFreightTotal = Math.round(simQuantity * baseRate);
   const baseDemurrageDaily = simVesselType === 'Capesize' ? 26500 : (simVesselType === 'Panamax' ? 16800 : 12500);
   const simulatedIdleCost = Math.round(simulatedWaitingDays * baseDemurrageDaily);

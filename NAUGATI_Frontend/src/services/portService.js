@@ -1,4 +1,5 @@
 import { PORTS, DATA_METADATA } from './demoData';
+import { apiClient } from './apiClient';
 
 export const portService = {
   getMetadata() {
@@ -131,18 +132,20 @@ export const portService = {
         return res;
       }
     } catch (err) {
-      console.warn('[portService] Prediction call failed, using baseline.', err.message);
+      console.warn('[portService] Port congestion prediction fallback:', err.message);
     }
     return {
       port_name: portName,
-      congestion_level: 'Medium',
-      average_waiting_hours: 24.5,
-      average_waiting_days: 1.0,
+      congestion_level: "Medium",
+      average_waiting_hours: 28.0,
+      average_waiting_days: 1.2,
       vessels_in_queue: 5,
-      congestion_score: 50.0,
-      berth_turnaround_hours: 36.0,
-      delay_risk: `Queue observed near ${portName}. Expected berthing in ~1 day.`,
-      model_version: 'port_congestion_v1',
+      congestion_score: 45,
+      berth_turnaround_hours: 36,
+      delay_risk: `Standard seasonal operations at ${portName}.`,
+      historical_benchmark_hours: 36,
+      confidence: 0.85,
+      model_version: "port_congestion_baseline"
     };
   }
 };

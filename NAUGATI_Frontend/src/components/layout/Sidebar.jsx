@@ -1,9 +1,9 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { 
-  Ship, LayoutDashboard, Search, TrendingUp, Navigation, 
+  LayoutDashboard, Search, TrendingUp, Navigation, 
   Map, FileText, AlertTriangle, Crosshair, Anchor, Bell, 
-  BarChart2, Settings, User, LogOut, Sliders, Layers, Award, Sparkles
+  BarChart2, Settings, User, LogOut, Sliders, Layers, Award, Sparkles, Ship
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -55,34 +55,22 @@ const Sidebar = () => {
       zIndex: 100
     }}>
       {/* Brand */}
-      <div 
+      <div
         onClick={() => navigate('/')}
-        style={{ 
-          padding: '20px 24px', 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '12px', 
+        style={{
+          padding: '14px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           borderBottom: '1px solid var(--border-color)',
           cursor: 'pointer'
         }}
       >
-        <div style={{
-          width: '38px',
-          height: '38px',
-          borderRadius: '8px',
-          backgroundColor: 'var(--primary-light)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <Ship size={22} color="var(--primary)" />
-        </div>
-        <div>
-          <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '0.05em' }}>NAUGATI</span>
-          <div style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: 700, letterSpacing: '0.05em' }}>
-            {isShipowner ? "CARRIER PORTAL" : "CHARTERING INTELLIGENCE"}
-          </div>
-        </div>
+        <img
+          src="/logo.png"
+          alt="NAUGATI"
+          style={{ height: '52px', width: 'auto', objectFit: 'contain' }}
+        />
       </div>
 
       {/* Role-Specific Navigation Links */}
@@ -118,10 +106,6 @@ const Sidebar = () => {
               <span>Backhaul & Opportunities</span>
             </NavLink>
 
-            <NavLink to="/dashboard/ai-simulator" style={({isActive}) => isActive ? {...linkStyle, ...activeStyle} : linkStyle}>
-              <Sparkles size={18} color="var(--primary)" />
-              <span>AI Rate & Route Simulator</span>
-            </NavLink>
 
             <NavLink to="/dashboard/freight-forecast" style={({isActive}) => isActive ? {...linkStyle, ...activeStyle} : linkStyle}>
               <TrendingUp size={18} />
@@ -148,10 +132,6 @@ const Sidebar = () => {
           <>
             <div style={sectionHeadingStyle}>CHARTERING WORKFLOW</div>
             
-            <NavLink to="/dashboard/ai-simulator" style={({isActive}) => isActive ? {...linkStyle, ...activeStyle} : linkStyle}>
-              <Sparkles size={18} color="var(--primary)" />
-              <span>AI Rate & Route Simulator</span>
-            </NavLink>
 
             <NavLink to="/dashboard/cargo" style={({isActive}) => isActive ? {...linkStyle, ...activeStyle} : linkStyle}>
               <Search size={18} />

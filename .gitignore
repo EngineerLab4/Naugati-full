@@ -1,0 +1,17 @@
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+.venv/
+
+# Build artifacts
+dist/
+build/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+NAUGATI Backend/prediction-service/artifacts/

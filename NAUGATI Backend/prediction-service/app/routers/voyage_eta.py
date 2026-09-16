@@ -32,13 +32,15 @@ def predict_voyage_eta(req: VoyageEtaRequest):
         vessel_class=req.vessel_class or "Panamax",
     )
 
-    if artifact and isinstance(artifact, dict) and "model" in artifact:
-        model = artifact["model"]
-        feature_cols = artifact.get("feature_cols", list(feat_df.columns))
-        total_duration_hours = float(model.predict(feat_df[feature_cols])[0])
-    else:
-        sea_transit_hours = dist / speed
-        total_duration_hours = sea_transit_hours + delay_hist + port_wait + 36.0
+    if not (artifact and isinstance(artifact, dict) and "model" in artifact):
+        raise HTTPException(
+            status_code=503,
+            detail="Voyage ETA model artifact is not loaded. No synthetic predictions generated."
+        )
+
+    model = artifact["model"]
+    feature_cols = artifact.get("feature_cols", list(feat_df.columns))
+    total_duration_hours = float(model.predict(feat_df[feature_cols])[0])
 
     sea_transit_hours = dist / speed
     transit_days = round(sea_transit_hours / 24.0, 1)
